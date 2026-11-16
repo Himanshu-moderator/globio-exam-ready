@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/brand_widgets.dart';
+import 'app_shell.dart';
 import 'landing_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -56,7 +57,8 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     Navigator.of(context).pushReplacement(
       PageRouteBuilder<void>(
         transitionDuration: const Duration(milliseconds: 600),
-        pageBuilder: (_, __, ___) => const LandingScreen(),
+        pageBuilder: (_, __, ___) =>
+            AuthService.instance.isSignedIn ? const AppShell() : const LandingScreen(),
         transitionsBuilder: (_, a, __, child) => FadeTransition(
           opacity: CurvedAnimation(parent: a, curve: Curves.easeOut),
           child: child,

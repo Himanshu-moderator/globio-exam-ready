@@ -15,6 +15,41 @@ Built for the Globio *Founder's Office – Product Manager Intern* assignment.
 | Mock exams: Goethe A1, ÖSD A1, Goethe A2, Goethe B1 (15 questions each) | ✅ Done |
 | Analysis dashboard: readiness, per-skill breakdown, 2–3 focus areas, question review, tips | ✅ Done |
 | History of all past mocks with progress per exam | ✅ Done |
+| Dashboard app shell: Home, Mock exams, My results, Mentor, Profile (sidebar / bottom nav) | ✅ Done |
+| Personal student ID + editable profile | ✅ Done |
+| Globio coins: earn by score & daily question, spend on mocks & mentor sessions | ✅ Done |
+| Free biweekly mock (Fri 6 PM – Sat 6 PM IST) | ✅ Done |
+| Mentor session request & booking | ✅ Done |
+| Real exam result reporting, linked to the latest mock (predicted vs real) | ✅ Done |
+
+## Coins
+
+| Earn | Coins |
+|---|---|
+| Welcome bonus | +100 |
+| Mock score | score % (full marks = +100, the price of the next mock) |
+| Daily question — easy (A1) / medium (A2) / advanced (B1) | +5 / +10 / +20 (advanced = 1/5 of a mock) |
+| Daily question — wrong answer | +1 |
+
+| Spend | Coins |
+|---|---|
+| Mock exam | 100 |
+| Mentor session (= two full-marks mocks) | 200 |
+| Free mock, every other Friday 6 PM – Saturday 6 PM IST | free (one attempt per window) |
+
+The balance is the sum of an append-only ledger with a unique id per entry, so a reward or
+purchase can never be applied twice. The daily question is derived from (email, IST day), so a
+refresh cannot re-roll it. Mentor sessions need 24 h notice and can be cancelled up to 24 h before
+for a full refund.
+
+**Why Friday 6 PM – Saturday 6 PM IST for the free mock:** working professionals are free after
+office on Friday evening, college students on Saturday morning/afternoon, and it matches Globio's
+own evening demo slots (4 PM / 8 PM IST) and weekend live classes.
+
+**Real exam results** can't be pulled in automatically — Goethe/ÖSD exams are taken at a test
+centre and results are published on the provider's portal with no public API. The learner enters
+pass/fail (+ score); it is linked automatically to their latest mock for that exam before the exam
+date, and the app shows whether the mock's prediction matched.
 
 ## The mock exams
 

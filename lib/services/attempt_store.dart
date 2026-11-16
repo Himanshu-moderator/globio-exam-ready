@@ -2,7 +2,11 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../data/exams.dart';
 import '../models/attempt.dart';
+import 'local_store.dart';
+import 'readiness.dart';
+import 'wallet_service.dart';
 
 /// Saves attempts per learner in the browser (no backend).
 ///
@@ -96,8 +100,37 @@ class AttemptStore {
       attempt.autoSubmitted = auto;
     }
     final ok = await saveFinished(email, attempt);
-    if (ok) await clearActive(email);
+    if (ok) {
+      await clearActive(email);
+      await awardCoins(email, attempt);
+      AppEvents.instance.changed();
+    }
     return ok;
+  }
+
+  /// Coins earned for a finished mock (score % of the mock price). Paid once
+  /// per attempt — the ledger id `mock:<attempt id>` makes it idempotent.
+  static int coinsFor(Attempt attempt) {
+    final exam = examById(attempt.examId);
+    if (exam == null || !attempt.isFinished) return 0;
+    final r = Readiness.evaluate(exam, attempt);
+    return Wallet.coinsForScore(r.correct, r.total);
+  }
+
+  Future<void> awardCoins(String email, Attempt attempt) async {
+    final coins = coinsFor(attempt);
+    if (coins <= 0) return;
+    final exam = examById(attempt.examId);
+    await Wallet.add(
+      email,
+      CoinEntry(
+        id: 'mock:${attempt.id}',
+        amount: coins,
+        kind: 'mock',
+        note: 'Mock score · ${exam?.title ?? attempt.examId}',
+        at: attempt.submittedAt ?? DateTime.now(),
+      ),
+    );
   }
 
   /// If the in-progress attempt's time is over, submit it and return it.

@@ -35,7 +35,13 @@ class Attempt {
     required this.items,
     this.submittedAt,
     this.autoSubmitted = false,
+    this.payment,
   });
+
+  /// How the mock was paid: `free:<window id>` or "coins". Null for older data.
+  String? payment;
+
+  bool get wasFree => payment?.startsWith('free:') ?? false;
 
   final String id;
   final String examId;
@@ -57,6 +63,7 @@ class Attempt {
         'deadline': deadline.toUtc().toIso8601String(),
         'submitted': submittedAt?.toUtc().toIso8601String(),
         'auto': autoSubmitted,
+        'pay': payment,
         'items': items.map((i) => i.toJson()).toList(),
       };
 
@@ -90,6 +97,7 @@ class Attempt {
         items: items,
         submittedAt: submitted?.toLocal(),
         autoSubmitted: j['auto'] == true,
+        payment: j['pay'] is String ? j['pay'] as String : null,
       );
     } catch (_) {
       return null;

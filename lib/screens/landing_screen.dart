@@ -4,8 +4,7 @@ import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/brand_widgets.dart';
 import 'auth_screen.dart';
-import 'exam_select_screen.dart';
-import 'history_screen.dart';
+import 'app_shell.dart';
 
 class LandingScreen extends StatefulWidget {
   const LandingScreen({super.key});
@@ -48,21 +47,32 @@ class _LandingScreenState extends State<LandingScreen> with SingleTickerProvider
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Welcome, $name! You are signed in.')),
       );
+      _openApp();
     }
     return ok == true;
   }
 
-  Future<void> _startCheck() async {
-    if (!AuthService.instance.isSignedIn) {
-      final ok = await _openAuth(AuthMode.signUp);
-      if (!ok || !mounted) return;
-    }
-    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const ExamSelectScreen()));
+  /// Signed-in area (dashboard with tabs).
+  void _openApp() {
+    Navigator.of(context).pushAndRemoveUntil(
+      PageRouteBuilder<void>(
+        transitionDuration: const Duration(milliseconds: 350),
+        pageBuilder: (_, __, ___) => const AppShell(),
+        transitionsBuilder: (_, a, __, child) => FadeTransition(opacity: a, child: child),
+      ),
+      (_) => false,
+    );
   }
 
-  void _openResults() {
-    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const HistoryScreen()));
+  Future<void> _startCheck() async {
+    if (!AuthService.instance.isSignedIn) {
+      await _openAuth(AuthMode.signUp);
+      return;
+    }
+    _openApp();
   }
+
+  void _openResults() => _openApp();
 
   @override
   Widget build(BuildContext context) {
@@ -300,7 +310,7 @@ class _NavBar extends StatelessWidget {
                         style: const TextStyle(
                             color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
                   ),
-                PillButton(label: 'My results', variant: PillVariant.gold, onPressed: onResults),
+                PillButton(label: 'Dashboard', variant: PillVariant.gold, onPressed: onResults),
                 const SizedBox(width: 10),
                 PillButton(
                   label: 'Log out',

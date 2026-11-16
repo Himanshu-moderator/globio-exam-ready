@@ -251,6 +251,22 @@ class AuthService extends ChangeNotifier {
     return true;
   }
 
+  /// Changes the signed-in learner's display name. Returns null on success.
+  Future<String?> updateName(String name) async {
+    final user = _current;
+    if (user == null || _prefs == null) return storageUnavailable;
+    final err = AuthLimits.validateName(name);
+    if (err != null) return err;
+    final users = _users();
+    final record = users[user.email];
+    if (record is! Map) return 'Account not found.';
+    users[user.email] = {...Map<String, dynamic>.from(record), 'name': name.trim()};
+    if (!await _safe(() => _prefs!.setString(_usersKey, jsonEncode(users)))) return storageUnavailable;
+    _current = AppUser(name: name.trim(), email: user.email);
+    notifyListeners();
+    return null;
+  }
+
   Future<void> logOut() async {
     final prefs = _prefs;
     if (prefs != null) await _safe(() => prefs.remove(_sessionKey));

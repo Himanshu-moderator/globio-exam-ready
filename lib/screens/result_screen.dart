@@ -4,14 +4,19 @@ import 'package:flutter/material.dart';
 
 import '../models/attempt.dart';
 import '../models/quiz.dart';
+import '../services/attempt_store.dart';
+import '../services/auth_service.dart';
 import '../services/readiness.dart';
+import '../services/real_result_service.dart';
+import '../services/wallet_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
 import '../widgets/app_header.dart';
 import '../widgets/brand_widgets.dart';
+import '../widgets/coin_widgets.dart';
 import '../widgets/verdict_style.dart';
-import 'exam_select_screen.dart';
-import 'history_screen.dart';
+import 'app_shell.dart';
+import 'tabs/mentor_tab.dart';
 
 /// Analysis dashboard for one finished attempt.
 class ResultScreen extends StatefulWidget {
@@ -19,7 +24,7 @@ class ResultScreen extends StatefulWidget {
   final ExamInfo exam;
   final Attempt attempt;
 
-  /// True right after submitting: closing goes to the history list.
+  /// True right after submitting: closing goes to My results.
   final bool justFinished;
 
   @override
@@ -28,18 +33,37 @@ class ResultScreen extends StatefulWidget {
 
 class _ResultScreenState extends State<ResultScreen> {
   late final AttemptResult r = Readiness.evaluate(widget.exam, widget.attempt);
+  late final int coins = AttemptStore.coinsFor(widget.attempt);
   bool _mistakesOnly = true;
+  RealResult? _real;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadReal();
+  }
+
+  Future<void> _loadReal() async {
+    final email = AuthService.instance.currentUser?.email;
+    if (email == null) return;
+    final all = await RealResultService.all(email);
+    final match = all.where((x) => x.linkedAttemptId == widget.attempt.id).firstOrNull;
+    if (mounted && match != null) setState(() => _real = match);
+  }
 
   void _close() {
     if (widget.justFinished) {
-      Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder: (_) => const HistoryScreen()));
+      ShellNav.open(context, ShellTab.results);
     } else {
       Navigator.of(context).pop();
     }
   }
 
-  void _newMock() {
-    Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder: (_) => const ExamSelectScreen()));
+  void _newMock() => ShellNav.open(context, ShellTab.mocks);
+
+  void _mentor() {
+    MentorTab.pendingAttemptId = widget.attempt.id;
+    ShellNav.open(context, ShellTab.mentor);
   }
 
   @override
@@ -67,9 +91,13 @@ class _ResultScreenState extends State<ResultScreen> {
         Expanded(
           child: SingleChildScrollView(
             child: Column(children: [
-              _Hero(r: r),
+              _Hero(r: r, coins: coins),
               PageBody(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  if (_real != null) ...[
+                    _RealBanner(real: _real!, verdict: r.verdict),
+                    const SizedBox(height: 28),
+                  ],
                   SectionTitle('Skill breakdown',
                       subtitle: 'The marker on each bar is the real exam\'s pass mark (${widget.exam.passPct}%).'),
                   _ResponsiveGrid(children: [
@@ -145,6 +173,30 @@ class _ResultScreenState extends State<ResultScreen> {
                       ),
                     ]),
                   ),
+                  const SizedBox(height: 16),
+                  Panel(
+                    child: Wrap(
+                      spacing: 16,
+                      runSpacing: 12,
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        const Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(Icons.support_agent_rounded, color: GlobioColors.primary, size: 28),
+                          SizedBox(width: 12),
+                          Flexible(
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Text('Go through this mock with a mentor',
+                                  style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
+                              Text('Post-exam analysis and a plan for your next steps · ${Wallet.mentorPrice} coins',
+                                  style: TextStyle(fontSize: 13, color: GlobioColors.mutedForeground)),
+                            ]),
+                          ),
+                        ]),
+                        PillButton(label: 'Book a mentor', variant: PillVariant.outlineDark, onPressed: _mentor),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 32),
                   Wrap(spacing: 12, runSpacing: 12, children: [
                     PillButton(label: 'Take a new mock', icon: Icons.refresh_rounded, large: true, onPressed: _newMock),
@@ -162,9 +214,38 @@ class _ResultScreenState extends State<ResultScreen> {
 
 // ───────────────────────────── Hero ─────────────────────────────
 
+class _RealBanner extends StatelessWidget {
+  const _RealBanner({required this.real, required this.verdict});
+  final RealResult real;
+  final Verdict verdict;
+
+  @override
+  Widget build(BuildContext context) {
+    final matched = verdict == Verdict.almost ? null : (verdict == Verdict.ready) == real.passed;
+    return Panel(
+      color: real.passed ? GlobioColors.successSoft : GlobioColors.destructiveSoft,
+      borderColor: (real.passed ? GlobioColors.success : GlobioColors.destructive).withValues(alpha: 0.4),
+      child: Row(children: [
+        Icon(real.passed ? Icons.workspace_premium_rounded : Icons.replay_rounded,
+            color: real.passed ? GlobioColors.success : GlobioColors.destructive, size: 28),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Text(
+            'Real exam on ${formatShortDate(real.date)}: ${real.passed ? 'passed' : 'not passed'}'
+            '${real.score != null ? ' (${real.score}/100)' : ''}. '
+            '${matched == null ? 'This mock said "almost ready" — a borderline call.' : (matched ? 'This mock predicted it correctly.' : 'This mock\'s prediction was off.')}',
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, height: 1.5),
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
 class _Hero extends StatelessWidget {
-  const _Hero({required this.r});
+  const _Hero({required this.r, required this.coins});
   final AttemptResult r;
+  final int coins;
 
   @override
   Widget build(BuildContext context) {
@@ -214,6 +295,16 @@ class _Hero extends StatelessWidget {
             _HeroStat(label: 'Score', value: '${r.correct}/${r.total} · ${r.overallPct}%'),
             _HeroStat(label: 'Pass mark', value: '${r.exam.passPct}%'),
             _HeroStat(label: 'Time used', value: formatDuration(used)),
+            Container(
+              padding: const EdgeInsets.fromLTRB(6, 6, 14, 6),
+              decoration: BoxDecoration(color: GlobioColors.secondary, borderRadius: BorderRadius.circular(999)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                const CoinIcon(size: 20),
+                const SizedBox(width: 6),
+                Text('+$coins coins earned',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: GlobioColors.foreground)),
+              ]),
+            ),
             if (a.autoSubmitted) const _HeroStat(label: 'Submitted', value: 'automatically'),
           ],
         ),
