@@ -393,17 +393,30 @@ class _Hero extends StatelessWidget {
           0.7,
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 540),
-            child: Text(
-              'Finished A1 German and thinking of booking your Goethe or ÖSD exam? '
-              'Take a short 10⁠–⁠15 question check across vocabulary, grammar and reading. '
-              'See how ready you are in each skill — and the 2–3 things to practise before you book.',
-              textAlign: wide ? TextAlign.start : TextAlign.center,
-              style: TextStyle(
+            child: Builder(builder: (context) {
+              final style = TextStyle(
                 color: Colors.white.withValues(alpha: 0.82),
                 fontSize: w < 600 ? 15 : 17,
                 height: 1.65,
-              ),
-            ),
+              );
+              // "10–15" as one unbreakable unit, using only glyphs Poppins has.
+              return Text.rich(
+                TextSpan(style: style, children: [
+                  const TextSpan(
+                      text: 'Finished A1 German and thinking of booking your Goethe or ÖSD exam? '
+                          'Take a short '),
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.baseline,
+                    baseline: TextBaseline.alphabetic,
+                    child: Text('10–15', style: style),
+                  ),
+                  const TextSpan(
+                      text: ' question check across vocabulary, grammar and reading. '
+                          'See how ready you are in each skill — and the 2–3 things to practise before you book.'),
+                ]),
+                textAlign: wide ? TextAlign.start : TextAlign.center,
+              );
+            }),
           ),
         ),
         const SizedBox(height: 32),
