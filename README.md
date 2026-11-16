@@ -146,20 +146,29 @@ flutter build web --release --no-web-resources-cdn
 
 ```
 lib/
-  main.dart                 App entry
-  theme/app_theme.dart      Globio colours, gradients, theme
-  services/auth_service.dart Local-only auth
-  screens/splash_screen.dart
-  screens/landing_screen.dart
-  screens/auth_screen.dart
-  widgets/brand_widgets.dart Logo, gold text, pill buttons, dot pattern
-  data/exams.dart            Exam definitions + pass rules
-  data/banks/                120 questions (30 per exam)
-  data/topics.dart           Fix / example / practice tip per topic
-  services/quiz_engine.dart  Builds a different set per learner
-  services/readiness.dart    Scoring + readiness formula
-  services/attempt_store.dart Final, append-only results
-  screens/exam_select_screen.dart, exam_screen.dart, result_screen.dart, history_screen.dart
-test/                       Auth, question-bank, engine, readiness and storage tests
-research/                   Evidence sheet: why learners fail German exams
+  main.dart                      App entry
+  theme/app_theme.dart           Globio colours, gradients, theme
+  data/exams.dart                Exam definitions + pass marks
+  data/banks/                    120 questions (30 per exam)
+  data/topics.dart               Fix / example / practice tip per topic
+  models/                        Question, exam and attempt models
+  services/readiness.dart        Scoring + readiness formula  ← the core
+  services/quiz_engine.dart      Builds a different set per learner
+  services/attempt_store.dart    Final, append-only results
+  services/auth_service.dart     Local-only auth
+  services/wallet_service.dart   Coins ledger and prices
+  services/daily_service.dart    Daily question
+  services/mentor_service.dart   Mentor slots and bookings
+  services/mock_access.dart      Free biweekly mock / paid access
+  services/profile_service.dart  Student ID and profile
+  services/real_result_service.dart  Real exam result vs. prediction
+  screens/                       Splash, landing, auth, exam, result
+  screens/app_shell.dart         Dashboard shell (sidebar / bottom nav)
+  screens/tabs/                  Home, Mock exams, My results, Mentor, Profile
+  widgets/                       Brand, header, coin and launcher widgets
+  utils/                         Date formatting, IST time helpers
+test/                            Auth, question-bank, engine, readiness, coins, schedule tests
+research/                        Evidence sheet: why learners fail German exams
 ```
+
+**Live app:** https://himanshu-moderator.github.io/globio-exam-ready/
