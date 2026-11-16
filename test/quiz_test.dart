@@ -1,0 +1,270 @@
+import 'dart:convert';
+import 'dart:math';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:globio_exam_ready/data/exams.dart';
+import 'package:globio_exam_ready/data/topics.dart';
+import 'package:globio_exam_ready/models/attempt.dart';
+import 'package:globio_exam_ready/models/quiz.dart';
+import 'package:globio_exam_ready/services/attempt_store.dart';
+import 'package:globio_exam_ready/services/quiz_engine.dart';
+import 'package:globio_exam_ready/services/readiness.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+/// Answers an attempt so that exactly [correctPerSkill] questions per skill are right.
+void answer(ExamInfo exam, Attempt a, Map<Skill, int> correctPerSkill) {
+  final left = Map.of(correctPerSkill);
+  for (final item in a.items) {
+    final q = questionById(exam, item.questionId)!;
+    if ((left[q.skill] ?? 0) > 0) {
+      item.chosen = q.answer;
+      left[q.skill] = left[q.skill]! - 1;
+    } else {
+      item.chosen = (q.answer + 1) % q.options.length;
+    }
+  }
+}
+
+void main() {
+  group('Question banks', () {
+    test('every exam has its own bank with enough questions per skill', () {
+      final allIds = <String>{};
+      for (final e in exams) {
+        for (final s in Skill.values) {
+          final n = e.questions.where((q) => q.skill == s).length;
+          expect(n, greaterThanOrEqualTo(e.perSkill * 2),
+              reason: '${e.id} needs at least 2× perSkill ${s.name} questions for variety');
+        }
+        for (final q in e.questions) {
+          expect(allIds.add(q.id), isTrue, reason: 'duplicate id ${q.id} (exams must not share questions)');
+        }
+      }
+    });
+
+    test('every question is well-formed', () {
+      for (final e in exams) {
+        for (final q in e.questions) {
+          final where = '${e.id}/${q.id}';
+          expect(q.options.length, inInclusiveRange(2, 4), reason: where);
+          expect(q.options.toSet().length, q.options.length, reason: '$where has duplicate options');
+          expect(q.answer, inInclusiveRange(0, q.options.length - 1), reason: where);
+          expect(q.prompt.trim(), isNotEmpty, reason: where);
+          expect(q.explanation.trim(), isNotEmpty, reason: where);
+          expect(topicGuides.containsKey(q.topic), isTrue, reason: '$where has unknown topic ${q.topic}');
+          if (q.skill == Skill.reading) {
+            expect(q.passage?.trim(), isNotEmpty, reason: '$where: reading needs a text');
+          }
+        }
+      }
+    });
+
+    test('no characters the Poppins font cannot draw (arrows etc.)', () {
+      final banned = RegExp('[←-⇿⁠￼]');
+      final texts = <String>[
+        for (final e in exams) ...[
+          e.passRule,
+          ...e.tips,
+          for (final q in e.questions) ...[q.prompt, q.explanation, ...q.options, q.passage ?? ''],
+        ],
+        for (final g in topicGuides.values) ...[g.title, g.fix, g.example, g.practise],
+      ];
+      for (final t in texts) {
+        expect(banned.hasMatch(t), isFalse, reason: 'unsupported glyph in: $t');
+      }
+    });
+
+    test('Richtig/Falsch items are not all the same answer', () {
+      for (final e in exams) {
+        final tf = e.questions.where((q) => !q.shuffleOptions).toList();
+        expect(tf.where((q) => q.answer == 0), isNotEmpty, reason: e.id);
+        expect(tf.where((q) => q.answer == 1), isNotEmpty, reason: e.id);
+      }
+    });
+  });
+
+  group('Quiz engine', () {
+    final exam = examById('goethe-a1')!;
+
+    test('draws perSkill questions per skill, no duplicates, only from that exam', () {
+      final a = QuizEngine.create(exam, random: Random(1));
+      expect(a.items.length, exam.totalQuestions);
+      expect(a.items.map((i) => i.questionId).toSet().length, a.items.length);
+      for (final s in Skill.values) {
+        expect(a.items.where((i) => questionById(exam, i.questionId)!.skill == s).length, exam.perSkill);
+      }
+      expect(a.deadline.difference(a.startedAt), Duration(minutes: exam.minutes));
+    });
+
+    test('different learners get different sets and orders', () {
+      final sets = <String>{};
+      final orders = <String>{};
+      for (var seed = 0; seed < 20; seed++) {
+        final a = QuizEngine.create(exam, random: Random(seed));
+        sets.add((a.items.map((i) => i.questionId).toList()..sort()).join(','));
+        orders.add(a.items.map((i) => i.questionId).join(','));
+      }
+      expect(sets.length, greaterThan(15));
+      expect(orders.length, 20);
+    });
+
+    test('options are shuffled (except Richtig/Falsch) and stay a valid permutation', () {
+      var moved = 0;
+      for (var seed = 0; seed < 10; seed++) {
+        final a = QuizEngine.create(exam, random: Random(seed));
+        for (final item in a.items) {
+          final q = questionById(exam, item.questionId)!;
+          expect(item.order.toSet(), Set<int>.from(List.generate(q.options.length, (i) => i)));
+          if (!q.shuffleOptions) expect(item.order, [0, 1]);
+          if (q.shuffleOptions && item.order.first != 0) moved++;
+        }
+      }
+      expect(moved, greaterThan(0), reason: 'correct answer must not always be shown first');
+    });
+
+    test('a retake prefers questions the learner has not seen yet', () {
+      final first = QuizEngine.create(exam, random: Random(7));
+      first.submittedAt = DateTime.now();
+      final second = QuizEngine.create(exam, history: [first], random: Random(8));
+      final overlap = first.items.map((i) => i.questionId).toSet()
+        ..retainAll(second.items.map((i) => i.questionId));
+      expect(overlap, isEmpty, reason: 'bank has 10 per skill, so 5 fresh ones are available');
+    });
+  });
+
+  group('Readiness', () {
+    final goethe = examById('goethe-a1')!; // pass 60
+    final osd = examById('osd-a1')!; // pass 50
+
+    AttemptResult run(ExamInfo e, int v, int g, int r) {
+      final a = QuizEngine.create(e, random: Random(3));
+      answer(e, a, {Skill.vocabulary: v, Skill.grammar: g, Skill.reading: r});
+      a.submittedAt = DateTime.now();
+      return Readiness.evaluate(e, a);
+    }
+
+    test('all correct → ready, no focus areas', () {
+      final res = run(goethe, 5, 5, 5);
+      expect(res.overallPct, 100);
+      expect(res.verdict, Verdict.ready);
+      expect(res.focusAreas, isEmpty);
+    });
+
+    test('high total but one weak skill is NOT ready (one weak part fails the exam)', () {
+      final res = run(goethe, 5, 5, 2); // 80% overall, reading 40%
+      expect(res.overallPct, 80);
+      expect(res.verdict, isNot(Verdict.ready));
+    });
+
+    test('around the pass mark → almost ready', () {
+      final res = run(goethe, 3, 3, 4); // 67%, weakest 60
+      expect(res.verdict, Verdict.almost);
+    });
+
+    test('below the pass mark → not ready', () {
+      final res = run(goethe, 2, 2, 2); // 40%
+      expect(res.verdict, Verdict.notYet);
+    });
+
+    test('pass mark is exam-specific: same score can mean different verdicts', () {
+      expect(run(goethe, 3, 3, 2).verdict, Verdict.notYet); // 53% < 60
+      expect(run(osd, 3, 3, 2).verdict, Verdict.almost); // 53% ≥ 50
+    });
+
+    test('readiness score = 60% overall + 40% weakest skill', () {
+      final res = run(goethe, 5, 4, 2); // overall 73, weakest 40
+      expect(res.readinessScore, (0.6 * 73 + 0.4 * 40).round());
+    });
+
+    test('focus areas come only from wrong answers, max 3', () {
+      final res = run(goethe, 1, 1, 1);
+      expect(res.focusAreas.length, lessThanOrEqualTo(3));
+      final wrongTopics = res.reviews.where((r) => !r.isCorrect).map((r) => r.question.topic).toSet();
+      for (final f in res.focusAreas) {
+        expect(wrongTopics, contains(f.topicId));
+      }
+    });
+
+    test('focus areas cover every weak skill before repeating one', () {
+      final res = run(goethe, 0, 2, 4); // vocab 0%, grammar 40% (both weak), reading 80%
+      final skills = res.focusAreas.map((f) => f.skill).toSet();
+      expect(skills, containsAll([Skill.vocabulary, Skill.grammar]));
+      expect(res.focusAreas.first.skill, Skill.vocabulary, reason: 'weakest skill first');
+    });
+
+    test('unanswered questions count as wrong', () {
+      final a = QuizEngine.create(goethe, random: Random(5));
+      a.submittedAt = DateTime.now();
+      final res = Readiness.evaluate(goethe, a);
+      expect(res.correct, 0);
+      expect(res.reviews.every((r) => r.unanswered), isTrue);
+    });
+
+    test('tampered answers (out of range / unknown ids) never crash', () {
+      final a = QuizEngine.create(goethe, random: Random(5));
+      a.items[0].chosen = 99;
+      a.items.add(AttemptItem(questionId: 'does-not-exist', order: [0, 1]));
+      a.items[1] = AttemptItem(questionId: a.items[1].questionId, order: [5, 5, 5], chosen: 0);
+      final res = Readiness.evaluate(goethe, a);
+      expect(res.total, goethe.totalQuestions);
+      expect(res.reviews[0].unanswered, isTrue);
+    });
+  });
+
+  group('Attempt storage', () {
+    const email = 'asha@example.com';
+    final exam = examById('goethe-a2')!;
+
+    setUp(() => SharedPreferences.setMockInitialValues({}));
+
+    test('JSON round trip keeps everything', () {
+      final a = QuizEngine.create(exam, random: Random(2));
+      a.items[0].chosen = 2;
+      final b = Attempt.fromJson(jsonDecode(jsonEncode(a.toJson())))!;
+      expect(b.id, a.id);
+      expect(b.items.map((i) => i.questionId), a.items.map((i) => i.questionId));
+      expect(b.items[0].chosen, 2);
+      expect(b.items[0].order, a.items[0].order);
+    });
+
+    test('malformed JSON returns null instead of crashing', () {
+      expect(Attempt.fromJson(null), isNull);
+      expect(Attempt.fromJson({'id': 1}), isNull);
+      expect(Attempt.fromJson({'id': 'x', 'exam': 'e', 'start': 'bad', 'deadline': 'bad', 'items': []}), isNull);
+    });
+
+    test('submitted results are final: saved once, never overwritten', () async {
+      final store = AttemptStore.instance;
+      final a = QuizEngine.create(exam, random: Random(2));
+      await store.saveActive(email, a);
+      a.items[0].chosen = 0;
+      expect(await store.submit(email, a), isTrue);
+      expect(await store.active(email), isNull);
+
+      final changed = Attempt.fromJson(a.toJson())!..items[0].chosen = 1;
+      await store.saveFinished(email, changed);
+      final hist = await store.history(email);
+      expect(hist.length, 1);
+      expect(hist.first.items[0].chosen, 0, reason: 'a submitted attempt must not be changed');
+    });
+
+    test('an expired running exam is auto-submitted at its deadline', () async {
+      final store = AttemptStore.instance;
+      final start = DateTime.now().subtract(const Duration(hours: 1));
+      final a = QuizEngine.create(exam, random: Random(4), now: start);
+      await store.saveActive(email, a);
+      final done = await store.finalizeIfExpired(email);
+      expect(done, isNotNull);
+      final hist = await store.history(email);
+      expect(hist.single.autoSubmitted, isTrue);
+      expect(hist.single.submittedAt, a.deadline);
+      expect(await store.active(email), isNull);
+    });
+
+    test('history is per learner', () async {
+      final store = AttemptStore.instance;
+      final a = QuizEngine.create(exam, random: Random(9))..submittedAt = DateTime.now();
+      await store.saveFinished(email, a);
+      expect(await store.history('someone.else@example.com'), isEmpty);
+    });
+  });
+}

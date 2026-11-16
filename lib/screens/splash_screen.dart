@@ -15,7 +15,7 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMixin {
-  // Intro timeline: logo → tagline → loader.
+  // Intro timeline: logo › tagline › loader.
   late final AnimationController _intro =
       AnimationController(vsync: this, duration: const Duration(milliseconds: 1400));
   // Progress bar fill.
@@ -163,7 +163,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            'Goethe & ÖSD A1 readiness check',
+                            'Goethe & ÖSD mock exams',
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.75),
                               fontSize: 14,

@@ -4,6 +4,8 @@ import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/brand_widgets.dart';
 import 'auth_screen.dart';
+import 'exam_select_screen.dart';
+import 'history_screen.dart';
 
 class LandingScreen extends StatefulWidget {
   const LandingScreen({super.key});
@@ -33,7 +35,7 @@ class _LandingScreenState extends State<LandingScreen> with SingleTickerProvider
     }
   }
 
-  Future<void> _openAuth(AuthMode mode) async {
+  Future<bool> _openAuth(AuthMode mode) async {
     final ok = await Navigator.of(context).push<bool>(
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 350),
@@ -47,17 +49,19 @@ class _LandingScreenState extends State<LandingScreen> with SingleTickerProvider
         SnackBar(content: Text('Welcome, $name! You are signed in.')),
       );
     }
+    return ok == true;
   }
 
-  void _startCheck() {
+  Future<void> _startCheck() async {
     if (!AuthService.instance.isSignedIn) {
-      _openAuth(AuthMode.signUp);
-      return;
+      final ok = await _openAuth(AuthMode.signUp);
+      if (!ok || !mounted) return;
     }
-    // The readiness check itself is the next build step.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('The readiness check is coming in the next step.')),
-    );
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const ExamSelectScreen()));
+  }
+
+  void _openResults() {
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const HistoryScreen()));
   }
 
   @override
@@ -73,6 +77,7 @@ class _LandingScreenState extends State<LandingScreen> with SingleTickerProvider
               onWhy: () => _scrollTo(_whyKey),
               onLogin: () => _openAuth(AuthMode.logIn),
               onSignup: () => _openAuth(AuthMode.signUp),
+              onResults: _openResults,
             ),
             Expanded(
               child: SingleChildScrollView(
@@ -255,8 +260,9 @@ class _NavBar extends StatelessWidget {
     required this.onWhy,
     required this.onLogin,
     required this.onSignup,
+    required this.onResults,
   });
-  final VoidCallback onHow, onSkills, onWhy, onLogin, onSignup;
+  final VoidCallback onHow, onSkills, onWhy, onLogin, onSignup, onResults;
 
   @override
   Widget build(BuildContext context) {
@@ -287,13 +293,15 @@ class _NavBar extends StatelessWidget {
                 const SizedBox(width: 10),
                 PillButton(label: 'Sign up', variant: PillVariant.gold, onPressed: onSignup),
               ] else ...[
-                if (w >= 480)
+                if (w >= 600)
                   Padding(
                     padding: const EdgeInsets.only(right: 12),
                     child: Text('Hi, ${user.firstName}',
                         style: const TextStyle(
                             color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
                   ),
+                PillButton(label: 'My results', variant: PillVariant.gold, onPressed: onResults),
+                const SizedBox(width: 10),
                 PillButton(
                   label: 'Log out',
                   variant: PillVariant.outlineLight,
@@ -512,7 +520,7 @@ class _HeroBadge extends StatelessWidget {
             const SizedBox(width: 8),
             const Flexible(
               child: Text(
-                'Goethe · ÖSD · A1 — check before you book',
+                'Goethe A1–B1 · ÖSD A1 — check before you book',
                 style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
               ),
             ),

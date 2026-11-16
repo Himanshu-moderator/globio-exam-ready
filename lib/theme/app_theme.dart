@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 /// Globio brand palette — taken 1:1 from the CSS tokens on globio.ai
-/// (`:root { --brand, --primary, --secondary, ... }`), converted HSL → hex.
+/// (`:root { --brand, --primary, --secondary, ... }`), converted HSL › hex.
 class GlobioColors {
   GlobioColors._();
 
@@ -40,6 +40,17 @@ class GlobioColors {
 
   /// --destructive: hsl(0 84% 60%).
   static const destructive = Color(0xFFEF4343);
+
+  /// Light red background used on globio.ai for error states (#FFE2E2).
+  static const destructiveSoft = Color(0xFFFFE2E2);
+
+  /// Success: globio.ai's CSS uses the emerald family (#ECFDF5, #D0FAE5,
+  /// #A4F4CF). Emerald-600 is used for readable text/icons on white.
+  static const success = Color(0xFF009966);
+  static const successSoft = Color(0xFFECFDF5);
+
+  /// Soft gold background (#FEF3C6, used on globio.ai for highlights).
+  static const secondarySoft = Color(0xFFFEF3C6);
 
   /// Hero background: linear-gradient(150deg, brand 0%, primary 55%, heroEnd 100%).
   static const heroGradient = LinearGradient(

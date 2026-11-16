@@ -12,8 +12,46 @@ Built for the Globio *Founder's Office – Product Manager Intern* assignment.
 | Splash screen with loading animation | ✅ Done |
 | Landing page in Globio's brand (palette + Poppins, taken from globio.ai) | ✅ Done |
 | Sign up / Log in (local only, no backend) | ✅ Done |
-| Readiness check (10–15 questions: vocabulary, grammar, reading) | ⏳ Next |
-| Result page with per-skill breakdown + 2–3 focus areas | ⏳ Next |
+| Mock exams: Goethe A1, ÖSD A1, Goethe A2, Goethe B1 (15 questions each) | ✅ Done |
+| Analysis dashboard: readiness, per-skill breakdown, 2–3 focus areas, question review, tips | ✅ Done |
+| History of all past mocks with progress per exam | ✅ Done |
+
+## The mock exams
+
+| Exam | Bank | Per mock | Time | Pass mark used |
+|---|---|---|---|---|
+| Goethe-Zertifikat A1 (Start Deutsch 1) | 30 | 5 vocab · 5 grammar · 5 reading | 15 min | 60% |
+| ÖSD Zertifikat A1 | 30 (Austrian settings) | 5 · 5 · 5 | 15 min | 50% |
+| Goethe-Zertifikat A2 | 30 | 5 · 5 · 5 | 20 min | 60% |
+| Goethe-Zertifikat B1 | 30 | 5 · 5 · 5 | 25 min | 60% |
+
+Pass marks come from the Goethe-Institut India exam FAQ and the ÖSD Durchführungsbestimmungen ZA1
+(written 38/75, oral 12/25).
+
+**A different set for every student and every retake** (`lib/services/quiz_engine.dart`):
+questions are drawn only from that exam's own bank, the learner's least-seen questions are
+preferred (random tie-break), then the question order and the answer options are shuffled
+(Richtig/Falsch keeps its natural order).
+
+**Final results** (`lib/services/attempt_store.dart`): a submitted mock is append-only — no edit,
+no delete. The running mock is saved after every answer, so a refresh resumes the same questions
+and timer; when time runs out it is submitted automatically. Leaving the exam submits it. While
+a mock is running, no other mock can be started.
+
+## How "ready" is calculated
+
+`lib/services/readiness.dart`:
+
+1. Each skill gets a percentage.
+2. **Readiness score = 60% × overall + 40% × weakest skill** — the weakest skill weighs heavily
+   because real exams fail you on one weak part (Goethe A1: every part; B1: every module; ÖSD:
+   minimum per part).
+3. Verdict against the real exam's pass mark *P*:
+   - **Ready to book** — overall ≥ P + 15 and every skill ≥ P
+   - **Almost ready** — overall ≥ P and every skill ≥ P − 20
+   - **Not ready yet** — below that
+4. Focus areas: topics where points were lost — one per weak skill first (weakest skill first),
+   then by number of mistakes; max 3. Each comes with a quick fix, an example and how to practise.
 
 ## Brand tokens (from globio.ai CSS)
 
@@ -80,6 +118,13 @@ lib/
   screens/landing_screen.dart
   screens/auth_screen.dart
   widgets/brand_widgets.dart Logo, gold text, pill buttons, dot pattern
-test/auth_service_test.dart Auth unit tests
+  data/exams.dart            Exam definitions + pass rules
+  data/banks/                120 questions (30 per exam)
+  data/topics.dart           Fix / example / practice tip per topic
+  services/quiz_engine.dart  Builds a different set per learner
+  services/readiness.dart    Scoring + readiness formula
+  services/attempt_store.dart Final, append-only results
+  screens/exam_select_screen.dart, exam_screen.dart, result_screen.dart, history_screen.dart
+test/                       Auth, question-bank, engine, readiness and storage tests
 research/                   Evidence sheet: why learners fail German exams
 ```
