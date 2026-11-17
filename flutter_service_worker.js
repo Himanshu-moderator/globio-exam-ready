@@ -14,7 +14,7 @@ const RESOURCES = {"assets/AssetManifest.bin": "62f2e1e5c89b8e408fc26d1fa12b2244
 "assets/assets/fonts/Poppins-SemiBold.ttf": "2c63e05091c7d89f6149c274971c7c23",
 "assets/assets/images/globio_logo.png": "d8688f6adb1a5eb12e21cf858e6f6d97",
 "assets/FontManifest.json": "2c2141a4a315857cbd643323d4b9c41d",
-"assets/fonts/MaterialIcons-Regular.otf": "666801518e1fa5cab50c7782b50e3a66",
+"assets/fonts/MaterialIcons-Regular.otf": "02273fbf5f297e5b13f8299a98012f86",
 "assets/NOTICES": "b9c6e6892377dd07a23270dcdb0fbc98",
 "assets/shaders/ink_sparkle.frag": "ecc85a2e95f5e9f53123dcaf8cb9b6ce",
 "boot.js": "1be4f1c94061d0a543d1b6992b9f3e3e",
@@ -37,7 +37,7 @@ const RESOURCES = {"assets/AssetManifest.bin": "62f2e1e5c89b8e408fc26d1fa12b2244
 "icons/Icon-maskable-512.png": "301a7604d45b3e739efc881eb04896ea",
 "index.html": "381765da5814f10d163cae0cba3eaaeb",
 "/": "381765da5814f10d163cae0cba3eaaeb",
-"main.dart.js": "936501308bb78475dca20bd27ebc3fc0",
+"main.dart.js": "20e26fd3c140d0e2273f9d769b1e8ac2",
 "manifest.json": "61d37bc14b181180480c19e96a3d9da5",
 "version.json": "38bf58767ca9b3efc60722b6a61f4ace"};
 // The application shell files that are downloaded before a service worker can
