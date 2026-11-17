@@ -6,6 +6,7 @@ import '../data/exams.dart';
 import '../models/attempt.dart';
 import '../models/quiz.dart';
 import '../services/attempt_store.dart';
+import '../services/speech.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
 import '../widgets/app_header.dart';
@@ -52,6 +53,7 @@ class _ExamScreenState extends State<ExamScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    Speech.stop();
     super.dispose();
   }
 
@@ -70,8 +72,20 @@ class _ExamScreenState extends State<ExamScreen> {
     _store.saveActive(widget.email, _a);
   }
 
+  /// Counts a play of the current listening item (counted when it starts,
+  /// as in the real exam) and saves it, so a refresh cannot reset it.
+  bool _countPlay() {
+    final item = _a.items[_index];
+    final q = _questions[_index];
+    if (_submitting || q == null || item.heard >= q.plays) return false;
+    setState(() => item.heard++);
+    _store.saveActive(widget.email, _a);
+    return true;
+  }
+
   void _go(int i) {
     if (i < 0 || i >= _a.items.length) return;
+    Speech.stop();
     setState(() => _index = i);
   }
 
@@ -79,6 +93,7 @@ class _ExamScreenState extends State<ExamScreen> {
     if (_submitting) return;
     _submitting = true;
     _timer?.cancel();
+    Speech.stop();
     final ok = await _store.submit(widget.email, _a, auto: auto);
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
@@ -214,7 +229,17 @@ class _ExamScreenState extends State<ExamScreen> {
                               key: ValueKey(_index),
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                if (q.passage != null) ...[
+                                if (q.isListening) ...[
+                                  _ListeningCard(
+                                    key: ValueKey('listen-$_index'),
+                                    question: q,
+                                    heard: item.heard,
+                                    lang: widget.exam.id.startsWith('osd') ? 'de-AT' : 'de-DE',
+                                    rate: switch (widget.exam.level) { 'A1' => 0.88, 'A2' => 0.94, _ => 1.0 },
+                                    onPlay: _countPlay,
+                                  ),
+                                  const SizedBox(height: 20),
+                                ] else if (q.passage != null) ...[
                                   _Passage(label: q.passageLabel, text: q.passage!),
                                   const SizedBox(height: 20),
                                 ],
@@ -437,6 +462,188 @@ class _OptionTileState extends State<_OptionTile> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ListeningCard extends StatefulWidget {
+  const _ListeningCard({
+    super.key,
+    required this.question,
+    required this.heard,
+    required this.lang,
+    required this.rate,
+    required this.onPlay,
+  });
+  final Question question;
+  final int heard;
+  final String lang;
+  final double rate;
+
+  /// Counts the play; returns false if none is left.
+  final bool Function() onPlay;
+
+  @override
+  State<_ListeningCard> createState() => _ListeningCardState();
+}
+
+class _ListeningCardState extends State<_ListeningCard> with SingleTickerProviderStateMixin {
+  late final AnimationController _wave = AnimationController(vsync: this, duration: const Duration(milliseconds: 450));
+  bool _playing = false;
+  bool? _germanVoice;
+
+  @override
+  void initState() {
+    super.initState();
+    if (Speech.supported) {
+      Speech.hasGermanVoice().then((v) {
+        if (mounted) setState(() => _germanVoice = v);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _wave.dispose();
+    super.dispose();
+  }
+
+  int get _left => (widget.question.plays - widget.heard).clamp(0, widget.question.plays);
+
+  Future<void> _play() async {
+    if (_playing || _left == 0 || !widget.onPlay()) return;
+    setState(() => _playing = true);
+    _wave.repeat(reverse: true);
+    await Speech.speak(widget.question.audio!, lang: widget.lang, rate: widget.rate);
+    if (!mounted) return;
+    _wave.stop();
+    setState(() => _playing = false);
+  }
+
+  String _status(int left, int plays) {
+    if (_playing) return 'Playing… listen carefully';
+    if (left == 0) return 'No plays left — choose your answer';
+    if (left == plays) {
+      return plays == 1 ? 'You can listen only once, as in the real exam' : 'You can listen $plays times';
+    }
+    return '$left play${left == 1 ? '' : 's'} left';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final q = widget.question;
+    final label = q.passageLabel ?? 'Recording';
+
+    if (!Speech.supported) {
+      // Browser without speech: show the script so the question stays answerable.
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _Passage(label: '$label · Transcript', text: transcriptOf(q.audio!)),
+        const SizedBox(height: 8),
+        const Text(
+          'Audio is not supported in this browser, so the text is shown instead. '
+          'Use Chrome, Edge or Safari for real listening practice.',
+          style: TextStyle(fontSize: 12.5, color: GlobioColors.mutedForeground),
+        ),
+      ]);
+    }
+
+    final left = _left;
+    final canPlay = left > 0 && !_playing;
+    final active = canPlay || _playing;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: GlobioColors.muted,
+        borderRadius: BorderRadius.circular(GlobioTheme.radius),
+        border: const Border(left: BorderSide(color: GlobioColors.primary, width: 4)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Icon(Icons.headphones_rounded, size: 16, color: GlobioColors.primary),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(label.toUpperCase(),
+                style: const TextStyle(fontSize: 11, letterSpacing: 1.5, fontWeight: FontWeight.w700, color: GlobioColors.primary)),
+          ),
+        ]),
+        const SizedBox(height: 14),
+        Row(children: [
+          Semantics(
+            button: true,
+            enabled: canPlay,
+            label: 'Play recording',
+            child: MouseRegion(
+              cursor: canPlay ? SystemMouseCursors.click : SystemMouseCursors.basic,
+              child: GestureDetector(
+                onTap: canPlay ? _play : null,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 160),
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: active ? GlobioColors.primary : GlobioColors.border,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    _playing ? Icons.graphic_eq_rounded : (left == 0 ? Icons.check_rounded : Icons.play_arrow_rounded),
+                    color: active ? Colors.white : GlobioColors.mutedForeground,
+                    size: 30,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(_status(left, q.plays), style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              Row(children: [
+                for (var i = 0; i < q.plays; i++)
+                  Container(
+                    width: 22,
+                    height: 6,
+                    margin: const EdgeInsets.only(right: 6),
+                    decoration: BoxDecoration(
+                      color: i < widget.heard ? GlobioColors.primary : GlobioColors.border,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                if (_playing) ...[
+                  const SizedBox(width: 6),
+                  AnimatedBuilder(
+                    animation: _wave,
+                    builder: (_, _) => Row(children: [
+                      for (var k = 0; k < 4; k++)
+                        Container(
+                          width: 3,
+                          height: 4 + 10 * (k.isEven ? _wave.value : 1 - _wave.value),
+                          margin: const EdgeInsets.only(right: 3),
+                          decoration: BoxDecoration(color: GlobioColors.accent, borderRadius: BorderRadius.circular(2)),
+                        ),
+                    ]),
+                  ),
+                ],
+              ]),
+            ]),
+          ),
+        ]),
+        if (_germanVoice == false) ...[
+          const SizedBox(height: 12),
+          const Text(
+            'Your browser has no German voice installed, so the audio may sound wrong. '
+            'Chrome and Edge include one; on Windows you can add "Deutsch" under Settings › Time & language › Speech.',
+            style: TextStyle(fontSize: 12.5, height: 1.45, color: GlobioColors.mutedForeground),
+          ),
+        ],
+        const SizedBox(height: 10),
+        const Text(
+          'Read the question and the answers first. Leaving this question while it plays stops the recording.',
+          style: TextStyle(fontSize: 12.5, height: 1.45, color: GlobioColors.mutedForeground),
+        ),
+      ]),
     );
   }
 }

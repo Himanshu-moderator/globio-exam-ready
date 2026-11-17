@@ -308,4 +308,35 @@ const Map<String, TopicGuide> topicGuides = {
     example: '"Viele sparen Zeit … Andere vermissen den Kontakt" › there are pros and cons.',
     practise: 'After each article, write one sentence: "Der Text sagt, dass …".',
   ),
+  // ── Listening ──
+  'listen_dialogues': TopicGuide(
+    title: 'Everyday conversations',
+    fix: 'Read the question and the three answers before the audio starts, then listen only for that piece of information. Speakers often change their mind — the last plan counts.',
+    example: '"Um drei? — Nein, lieber um vier." › the answer is vier, not drei.',
+    practise: 'Listen to one short A1/A2 dialogue a day (Goethe Übungssatz audio), pause after each line and say what you heard.',
+  ),
+  'listen_announcements': TopicGuide(
+    title: 'Announcements (station, shop, radio)',
+    fix: 'Announcements are often played only once. Listen for numbers, places and changes: Gleis, Verspätung, statt, heute nur.',
+    example: '"Der Zug fährt heute von Gleis sieben statt Gleis drei." › the platform is 7.',
+    practise: 'Watch the Deutsche Bahn / ÖBB announcement videos and write down platform, time and delay.',
+  ),
+  'listen_messages': TopicGuide(
+    title: 'Phone messages',
+    fix: 'A voicemail always has who, why and what to do next. Note the key detail (time, number, place) while you listen the first time, check it the second time.',
+    example: '"Bitte rufen Sie mich bis Freitag zurück." › call back before Friday.',
+    practise: 'Ask a friend to leave you a 20-second German voice message and write down the three key facts.',
+  ),
+  'listen_numbers': TopicGuide(
+    title: 'Numbers & times by ear',
+    fix: 'German says the ones before the tens (vierundzwanzig = 24) and "halb acht" is 7:30. Write numbers down as digits while you listen.',
+    example: '"Die Telefonnummer ist null-eins-sieben-zwei …", "um Viertel nach neun" = 9:15.',
+    practise: 'Play a German number dictation video for 5 minutes a day and write every number you hear.',
+  ),
+  'listen_detail': TopicGuide(
+    title: 'Longer talks & opinions (A2–B1)',
+    fix: 'Paraphrase is normal: the audio rarely uses the words of the answer. Listen for meaning and for signal words like aber, trotzdem, eigentlich, leider.',
+    example: '"Eigentlich wollte ich mit dem Auto fahren, aber …" › the speaker did not take the car.',
+    practise: 'Listen to one short Deutsche Welle "Langsam gesprochene Nachrichten" item a day and summarise it in one sentence.',
+  ),
 };

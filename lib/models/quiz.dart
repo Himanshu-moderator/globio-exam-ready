@@ -1,19 +1,25 @@
 /// Core quiz data types.
 library;
 
-enum Skill { vocabulary, grammar, reading }
+/// The four skills a mock checks. Listening and reading mirror the two
+/// receptive parts of the real written exam (Hören, Lesen), which carry
+/// equal points there; vocabulary and grammar are the building blocks a
+/// learner can practise directly.
+enum Skill { listening, reading, grammar, vocabulary }
 
 extension SkillLabels on Skill {
   String get label => switch (this) {
         Skill.vocabulary => 'Vocabulary',
         Skill.grammar => 'Grammar',
         Skill.reading => 'Reading',
+        Skill.listening => 'Listening',
       };
 
   String get german => switch (this) {
         Skill.vocabulary => 'Wortschatz',
         Skill.grammar => 'Grammatik',
         Skill.reading => 'Lesen',
+        Skill.listening => 'Hören',
       };
 }
 
@@ -30,19 +36,24 @@ class Question {
     required this.explanation,
     this.passage,
     this.passageLabel,
+    this.audio,
+    this.plays = 2,
     this.shuffleOptions = true,
   });
 
   /// Richtig/Falsch item. Options stay in the order "Richtig, Falsch".
+  /// With [audio] it is a listening item: the text is heard, not shown.
   const Question.trueFalse({
     required this.id,
     required this.topic,
     required this.prompt,
     required bool isTrue,
     required this.explanation,
-    required String this.passage,
     required String this.passageLabel,
-  })  : skill = Skill.reading,
+    this.passage,
+    this.audio,
+    this.plays = 2,
+  })  : skill = audio == null ? Skill.reading : Skill.listening,
         options = const ['Richtig', 'Falsch'],
         answer = isTrue ? 0 : 1,
         shuffleOptions = false;
@@ -62,11 +73,22 @@ class Question {
   /// Reading text shown above the question (reading items only).
   final String? passage;
 
-  /// What kind of text the passage is, e.g. "Notice", "Text message".
+  /// What kind of text or recording it is, e.g. "Notice", "Durchsage".
   final String? passageLabel;
+
+  /// Listening items: the German script the browser reads aloud. One line
+  /// per speaker turn; a leading "A:" or "B:" marks the speaker and is not
+  /// spoken. Hidden during the exam, shown as a transcript in the analysis.
+  final String? audio;
+
+  /// How often the recording may be played, as in the real exam
+  /// (Goethe A1 Hören: dialogues twice, announcements once).
+  final int plays;
 
   /// False for Richtig/Falsch, where a fixed order is clearer.
   final bool shuffleOptions;
+
+  bool get isListening => audio != null;
 }
 
 /// A mock exam the learner can take.
@@ -94,7 +116,7 @@ class ExamInfo {
   /// Time limit for this mock.
   final int minutes;
 
-  /// Questions drawn per skill (3 skills › total = perSkill * 3).
+  /// Questions drawn per skill (4 skills, so total = perSkill × 4 = 16).
   final int perSkill;
 
   /// Pass mark of the real exam in percent (Goethe 60, ÖSD A1 ≈ 50).

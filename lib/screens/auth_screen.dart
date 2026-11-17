@@ -375,7 +375,7 @@ class _BrandPanel extends StatelessWidget {
                 ),
                 const SizedBox(height: 28),
                 for (final t in const [
-                  'Score for vocabulary, grammar and reading',
+                  'Score for listening, reading, grammar and vocabulary',
                   'Your 2–3 focus areas before you book',
                   'Results saved to your account on this device',
                 ])

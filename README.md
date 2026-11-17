@@ -12,8 +12,9 @@ Built for the Globio *Founder's Office – Product Manager Intern* assignment.
 | Splash screen with loading animation | ✅ Done |
 | Landing page in Globio's brand (palette + Poppins, taken from globio.ai) | ✅ Done |
 | Sign up / Log in (local only, no backend) | ✅ Done |
-| Mock exams: Goethe A1, ÖSD A1, Goethe A2, Goethe B1 (15 questions each) | ✅ Done |
+| Mock exams: Goethe A1, ÖSD A1, Goethe A2, Goethe B1 (16 questions each, incl. listening with audio) | ✅ Done |
 | Analysis dashboard: readiness, per-skill breakdown, 2–3 focus areas, question review, tips | ✅ Done |
+| Result confidence: close-call flag + confirmation over the last 2 mocks | ✅ Done |
 | History of all past mocks with progress per exam | ✅ Done |
 | Dashboard app shell: Home, Mock exams, My results, Mentor, Profile (sidebar / bottom nav) | ✅ Done |
 | Personal student ID + editable profile | ✅ Done |
@@ -55,10 +56,25 @@ date, and the app shows whether the mock's prediction matched.
 
 | Exam | Bank | Per mock | Time | Pass mark used |
 |---|---|---|---|---|
-| Goethe-Zertifikat A1 (Start Deutsch 1) | 30 | 5 vocab · 5 grammar · 5 reading | 15 min | 60% |
-| ÖSD Zertifikat A1 | 30 (Austrian settings) | 5 · 5 · 5 | 15 min | 50% |
-| Goethe-Zertifikat A2 | 30 | 5 · 5 · 5 | 20 min | 60% |
-| Goethe-Zertifikat B1 | 30 | 5 · 5 · 5 | 25 min | 60% |
+| Goethe-Zertifikat A1 (Start Deutsch 1) | 40 | 4 listening · 4 reading · 4 grammar · 4 vocabulary | 20 min | 60% |
+| ÖSD Zertifikat A1 | 40 (Austrian settings) | 4 · 4 · 4 · 4 | 20 min | 50% |
+| Goethe-Zertifikat A2 | 40 | 4 · 4 · 4 · 4 | 25 min | 60% |
+| Goethe-Zertifikat B1 | 40 | 4 · 4 · 4 · 4 | 30 min | 60% |
+
+**Why 16 questions and four skills:** the assignment allows 10–15 questions; we use 16, the
+smallest number that gives every skill the same weight. In the real written exams listening
+(Hören) and reading (Lesen) are separate parts with equal points (Goethe A1: 25 points each, 3 parts
+each; ÖSD A1: 3 tasks each; A2/B1: 4–5 parts each), so the mock gives them the same number of
+questions. Vocabulary and grammar are kept as separate skills because they are what a learner can
+practise directly.
+
+**Listening** (`lib/data/banks/listening.dart`, `lib/services/speech*.dart`): each item is a German
+script read aloud by the browser's built-in speech engine (Web Speech API) — no audio files, no
+third-party requests from the app. It mirrors the real exam parts: short dialogues (played twice),
+announcements (played **once**), phone messages, and at B1 guided talks and opinions. The play count
+is saved with the attempt, so a refresh cannot reset it. Dialogues use two voices (or two pitches).
+Before a mock starts, the app checks the browser has a German voice and warns *before charging*
+if it does not (Chrome, Edge and Safari include one). The transcript is shown only in the analysis.
 
 Pass marks come from the Goethe-Institut India exam FAQ and the ÖSD Durchführungsbestimmungen ZA1
 (written 38/75, oral 12/25).
@@ -87,6 +103,11 @@ a mock is running, no other mock can be started.
    - **Not ready yet** — below that
 4. Focus areas: topics where points were lost — one per weak skill first (weakest skill first),
    then by number of mistakes; max 3. Each comes with a quick fix, an example and how to practise.
+5. **How sure is this result?** With 4 questions per skill one answer moves a skill by 25 points,
+   so the analysis also shows:
+   - **Close call** — getting a single question right/wrong would change the verdict.
+   - **Confirmed** — the last two mocks of the same exam, pooled (32 questions, 8 per skill), give
+     the same verdict. If they disagree, the app says the level is still moving.
 
 ## Brand tokens (from globio.ai CSS)
 
@@ -149,11 +170,12 @@ lib/
   main.dart                      App entry
   theme/app_theme.dart           Globio colours, gradients, theme
   data/exams.dart                Exam definitions + pass marks
-  data/banks/                    120 questions (30 per exam)
+  data/banks/                    160 questions (40 per exam, 10 per skill)
   data/topics.dart               Fix / example / practice tip per topic
   models/                        Question, exam and attempt models
   services/readiness.dart        Scoring + readiness formula  ← the core
   services/quiz_engine.dart      Builds a different set per learner
+  services/speech.dart           Browser text-to-speech for listening (web + test stub)
   services/attempt_store.dart    Final, append-only results
   services/auth_service.dart     Local-only auth
   services/wallet_service.dart   Coins ledger and prices

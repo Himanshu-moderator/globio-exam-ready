@@ -8,6 +8,7 @@ import '../services/auth_service.dart';
 import '../services/local_store.dart';
 import '../services/mock_access.dart';
 import '../services/quiz_engine.dart';
+import '../services/speech.dart';
 import '../services/wallet_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/ist.dart';
@@ -49,11 +50,14 @@ class MockLauncher {
     final free = await MockAccess.freeStatus(email);
     final balance = await Wallet.balance(email);
     final useFree = preferFree && free.available;
+    // Listening is read by the browser's German voice. Check before any coins
+    // are spent, so a learner is never charged for a mock they cannot hear.
+    final audioOk = Speech.supported && await Speech.hasGermanVoice();
     if (!context.mounted) return;
 
     final go = await showDialog<bool>(
       context: context,
-      builder: (_) => _StartDialog(exam: exam, useFree: useFree, balance: balance, free: free),
+      builder: (_) => _StartDialog(exam: exam, useFree: useFree, balance: balance, free: free, audioOk: audioOk),
     );
     if (go != true || !context.mounted) return;
 
@@ -79,17 +83,29 @@ class MockLauncher {
 }
 
 class _StartDialog extends StatelessWidget {
-  const _StartDialog({required this.exam, required this.useFree, required this.balance, required this.free});
+  const _StartDialog({
+    required this.exam,
+    required this.useFree,
+    required this.balance,
+    required this.free,
+    required this.audioOk,
+  });
   final ExamInfo exam;
   final bool useFree;
   final int balance;
   final FreeStatus free;
 
+  /// False when this browser has no German voice for the listening part.
+  final bool audioOk;
+
   @override
   Widget build(BuildContext context) {
     final canPay = useFree || balance >= Wallet.mockPrice;
     final rules = [
-      (Icons.quiz_outlined, '${exam.totalQuestions} questions: ${exam.perSkill} vocabulary, ${exam.perSkill} grammar, ${exam.perSkill} reading — mixed order.'),
+      (Icons.quiz_outlined,
+          '${exam.totalQuestions} questions: ${exam.perSkill} each of listening, reading, grammar and vocabulary — mixed order.'),
+      (Icons.headphones_rounded,
+          'Listening uses audio, so turn your sound on. Some recordings play twice, announcements only once — as in the real exam.'),
       (Icons.timer_outlined, '${exam.minutes} minutes. When time is up, your answers are submitted automatically.'),
       (Icons.lock_outline_rounded, 'Once submitted, the result is final. Leaving the exam also submits it.'),
       (Icons.toll_outlined, 'You earn coins for your score — full marks pays for your next mock (${Wallet.mockPrice} coins).'),
@@ -114,6 +130,26 @@ class _StartDialog extends StatelessWidget {
                   Expanded(child: Text(text, style: const TextStyle(fontSize: 14, height: 1.5))),
                 ]),
               ),
+            if (!audioOk) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(color: GlobioColors.secondarySoft, borderRadius: BorderRadius.circular(GlobioTheme.radius)),
+                child: const Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Icon(Icons.volume_off_rounded, size: 20, color: GlobioColors.foreground),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'This browser has no German voice, so the listening questions would not sound right and your '
+                      'listening score would not be accurate. For a fair result, open Globio in Google Chrome, '
+                      'Microsoft Edge or Safari.',
+                      style: TextStyle(fontSize: 13, height: 1.5, color: GlobioColors.foreground),
+                    ),
+                  ),
+                ]),
+              ),
+            ],
             const SizedBox(height: 6),
             Container(
               width: double.infinity,
@@ -149,7 +185,7 @@ class _StartDialog extends StatelessWidget {
               child: Wrap(alignment: WrapAlignment.end, spacing: 10, runSpacing: 10, children: [
                 PillButton(label: 'Not now', variant: PillVariant.outlineDark, onPressed: () => Navigator.of(context).pop(false)),
                 PillButton(
-                  label: useFree ? 'Start free mock' : 'Pay & start',
+                  label: !audioOk ? 'Start anyway' : (useFree ? 'Start free mock' : 'Pay & start'),
                   icon: Icons.arrow_forward_rounded,
                   onPressed: canPay ? () => Navigator.of(context).pop(true) : null,
                 ),

@@ -415,7 +415,7 @@ class _Hero extends StatelessWidget {
             // engine never needs to fetch a fallback font.
             child: Text(
               'Finished A1 German and thinking of booking your Goethe or ÖSD exam? '
-              'Take a short check of 10–15 questions across vocabulary, grammar and reading. '
+              'Take a short check of 16 questions across listening, reading, grammar and vocabulary. '
               'See how ready you are in each skill — and the 2–3 things to practise before you book.',
               textAlign: wide ? TextAlign.start : TextAlign.center,
               style: TextStyle(
@@ -459,7 +459,7 @@ class _Hero extends StatelessWidget {
             runSpacing: 10,
             alignment: WrapAlignment.center,
             children: [
-              _StatChip(icon: Icons.quiz_outlined, value: '10–15', label: 'Questions'),
+              _StatChip(icon: Icons.quiz_outlined, value: '16', label: 'Questions'),
               _StatChip(icon: Icons.layers_outlined, value: '3', label: 'Skills checked'),
               _StatChip(icon: Icons.bolt_outlined, value: 'Instant', label: 'Result'),
             ],
@@ -635,11 +635,15 @@ class _SampleReportCard extends StatelessWidget {
               ]),
             ),
             const SizedBox(height: 20),
-            const _SkillBar(label: 'Vocabulary', value: 0.8, color: GlobioColors.primary),
+            // Example numbers a 16-question mock can really produce (4 per skill).
+            // Overall 75%, but grammar is below the 60% pass mark › "Almost ready".
+            const _SkillBar(label: 'Listening', value: 0.75, color: GlobioColors.brand),
+            const SizedBox(height: 14),
+            const _SkillBar(label: 'Reading', value: 0.75, color: GlobioColors.accent),
             const SizedBox(height: 14),
             const _SkillBar(label: 'Grammar', value: 0.5, color: GlobioColors.secondary),
             const SizedBox(height: 14),
-            const _SkillBar(label: 'Reading', value: 0.7, color: GlobioColors.accent),
+            const _SkillBar(label: 'Vocabulary', value: 1.0, color: GlobioColors.primary),
             const SizedBox(height: 20),
             const Text('Practise before you book',
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
@@ -807,8 +811,8 @@ class _HowSection extends StatelessWidget {
           _StepCard(
             step: '01',
             title: 'Take the check',
-            body: '10–15 short questions in the style of the A1 exam, across vocabulary, '
-                'grammar and reading.',
+            body: '16 short questions in the style of the real exam: listening with audio, '
+                'reading, grammar and vocabulary.',
           ),
           _StepCard(
             step: '02',
@@ -866,11 +870,19 @@ class _SkillsSection extends StatelessWidget {
       child: Column(children: [
         const _SectionHeading(
           eyebrow: 'What we check',
-          title: 'The three skills that decide your result',
+          title: 'The four skills that decide your result',
           subtitle: 'Each question is tagged to one skill, so your result tells you '
               'what to practise — not just a single number.',
         ),
         _ResponsiveRow(children: const [
+          _SkillCard(
+            icon: Icons.headphones_rounded,
+            tileBg: GlobioColors.brand,
+            tileFg: Colors.white,
+            name: 'Listening',
+            german: 'Hören',
+            topics: ['Short everyday dialogues', 'Announcements, played once', 'Phone messages'],
+          ),
           _SkillCard(
             icon: Icons.translate_rounded,
             tileBg: GlobioColors.primary,

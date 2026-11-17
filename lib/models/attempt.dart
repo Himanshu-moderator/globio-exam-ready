@@ -2,7 +2,7 @@
 library;
 
 class AttemptItem {
-  AttemptItem({required this.questionId, required this.order, this.chosen});
+  AttemptItem({required this.questionId, required this.order, this.chosen, this.heard = 0});
 
   final String questionId;
 
@@ -13,7 +13,11 @@ class AttemptItem {
   /// Original option index the learner picked, or null if unanswered.
   int? chosen;
 
-  Map<String, dynamic> toJson() => {'q': questionId, 'o': order, 'c': chosen};
+  /// Listening items: how often the recording has been played. Saved with
+  /// the attempt so a refresh cannot reset the play limit.
+  int heard;
+
+  Map<String, dynamic> toJson() => {'q': questionId, 'o': order, 'c': chosen, if (heard > 0) 'h': heard};
 
   static AttemptItem? fromJson(Object? j) {
     if (j is! Map) return null;
@@ -22,7 +26,13 @@ class AttemptItem {
     final c = j['c'];
     if (q is! String || o is! List || o.any((e) => e is! int)) return null;
     if (c != null && c is! int) return null;
-    return AttemptItem(questionId: q, order: o.cast<int>(), chosen: c as int?);
+    final h = j['h'];
+    return AttemptItem(
+      questionId: q,
+      order: o.cast<int>(),
+      chosen: c as int?,
+      heard: h is int && h > 0 ? h : 0,
+    );
   }
 }
 

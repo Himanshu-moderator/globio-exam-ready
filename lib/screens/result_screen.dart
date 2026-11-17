@@ -8,6 +8,7 @@ import '../services/attempt_store.dart';
 import '../services/auth_service.dart';
 import '../services/readiness.dart';
 import '../services/real_result_service.dart';
+import '../services/speech.dart';
 import '../services/wallet_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/format.dart';
@@ -36,11 +37,19 @@ class _ResultScreenState extends State<ResultScreen> {
   late final int coins = AttemptStore.coinsFor(widget.attempt);
   bool _mistakesOnly = true;
   RealResult? _real;
+  Confidence? _confidence;
 
   @override
   void initState() {
     super.initState();
     _loadReal();
+    _loadConfidence();
+  }
+
+  Future<void> _loadConfidence() async {
+    final email = AuthService.instance.currentUser?.email;
+    final history = email == null ? <Attempt>[] : await AttemptStore.instance.history(email);
+    if (mounted) setState(() => _confidence = Readiness.confidence(r, history));
   }
 
   Future<void> _loadReal() async {
@@ -98,10 +107,15 @@ class _ResultScreenState extends State<ResultScreen> {
                     _RealBanner(real: _real!, verdict: r.verdict),
                     const SizedBox(height: 28),
                   ],
+                  if (_confidence != null) ...[
+                    _ConfidenceCard(c: _confidence!, onNewMock: _newMock),
+                    const SizedBox(height: 32),
+                  ],
                   SectionTitle('Skill breakdown',
                       subtitle: 'The marker on each bar is the real exam\'s pass mark (${widget.exam.passPct}%).'),
                   _ResponsiveGrid(children: [
-                    for (final s in Skill.values) _SkillCard(score: r.skills[s]!, passPct: widget.exam.passPct),
+                    for (final s in Skill.values)
+                      if (r.skills[s]!.total > 0) _SkillCard(score: r.skills[s]!, passPct: widget.exam.passPct),
                   ]),
                   const SizedBox(height: 40),
                   SectionTitle('Practise before you book',
@@ -166,7 +180,7 @@ class _ResultScreenState extends State<ResultScreen> {
                       SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'This mock checks vocabulary, grammar and reading. The real exam also tests listening, '
+                          'This mock checks listening, reading, grammar and vocabulary. The real exam also tests '
                           'writing and speaking, so practise those separately before you book.',
                           style: TextStyle(fontSize: 14, height: 1.55),
                         ),
@@ -605,7 +619,7 @@ class _ReviewCardState extends State<_ReviewCard> {
           Chip2(q.skill.label),
           if (rv.unanswered) Chip2('Not answered', bg: GlobioColors.destructiveSoft, fg: GlobioColors.destructive),
         ]),
-        if (q.passage != null) ...[
+        if (q.passage != null || q.audio != null) ...[
           const SizedBox(height: 10),
           GestureDetector(
             onTap: () => setState(() => _showText = !_showText),
@@ -614,7 +628,12 @@ class _ReviewCardState extends State<_ReviewCard> {
               child: Row(mainAxisSize: MainAxisSize.min, children: [
                 Icon(_showText ? Icons.expand_less_rounded : Icons.expand_more_rounded,
                     size: 18, color: GlobioColors.primary),
-                Text(_showText ? 'Hide the text' : 'Show the text (${q.passageLabel ?? 'Text'})',
+                Text(
+                    _showText
+                        ? (q.isListening ? 'Hide what you heard' : 'Hide the text')
+                        : (q.isListening
+                            ? 'Show what you heard (${q.passageLabel ?? 'Recording'})'
+                            : 'Show the text (${q.passageLabel ?? 'Text'})'),
                     style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: GlobioColors.primary)),
               ]),
             ),
@@ -628,7 +647,7 @@ class _ReviewCardState extends State<_ReviewCard> {
                 color: GlobioColors.muted,
                 borderRadius: BorderRadius.circular(GlobioTheme.radius - 4),
               ),
-              child: Text(q.passage!, style: const TextStyle(fontSize: 14, height: 1.55)),
+              child: Text(q.isListening ? transcriptOf(q.audio!) : q.passage!, style: const TextStyle(fontSize: 14, height: 1.55)),
             ),
         ],
         const SizedBox(height: 12),
@@ -716,4 +735,47 @@ class _TipRow extends StatelessWidget {
           ),
         ]),
       );
+}
+
+class _ConfidenceCard extends StatelessWidget {
+  const _ConfidenceCard({required this.c, required this.onNewMock});
+  final Confidence c;
+  final VoidCallback onNewMock;
+
+  @override
+  Widget build(BuildContext context) {
+    final (IconData icon, Color fg, Color bg) = switch (c.level) {
+      ConfidenceLevel.confirmed => (Icons.verified_rounded, GlobioColors.success, GlobioColors.successSoft),
+      ConfidenceLevel.mixed => (Icons.swap_vert_rounded, GlobioColors.foreground, GlobioColors.secondarySoft),
+      ConfidenceLevel.singleMock => (Icons.info_outline_rounded, GlobioColors.primary, GlobioColors.muted),
+      ConfidenceLevel.closeCall => (Icons.balance_rounded, GlobioColors.foreground, GlobioColors.secondarySoft),
+    };
+    final askForMore = c.level != ConfidenceLevel.confirmed;
+    return Panel(
+      padding: const EdgeInsets.all(20),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
+          child: Icon(icon, color: fg, size: 24),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('HOW SURE IS THIS RESULT?',
+                style: TextStyle(fontSize: 11, letterSpacing: 1.5, fontWeight: FontWeight.w700, color: GlobioColors.mutedForeground)),
+            const SizedBox(height: 4),
+            Text(c.title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 6),
+            Text(c.message, style: const TextStyle(fontSize: 14, height: 1.55, color: GlobioColors.mutedForeground)),
+            if (askForMore) ...[
+              const SizedBox(height: 12),
+              PillButton(label: 'Take another mock', variant: PillVariant.outlineDark, onPressed: onNewMock),
+            ],
+          ]),
+        ),
+      ]),
+    );
+  }
 }

@@ -85,7 +85,7 @@ class _MocksTabState extends State<MocksTab> {
           Text('Choose your mock exam', style: TextStyle(fontSize: w < 600 ? 24 : 28, fontWeight: FontWeight.w700)),
           const SizedBox(height: 6),
           const Text(
-            'Each mock draws 15 questions from that exam\'s own bank, at that exam\'s level — a different mix every time.',
+            'Each mock has 16 questions — listening, reading, grammar and vocabulary — from that exam\'s own bank, at that exam\'s level. A different mix every time.',
             style: TextStyle(fontSize: 14.5, color: GlobioColors.mutedForeground, height: 1.55),
           ),
           const SizedBox(height: 20),

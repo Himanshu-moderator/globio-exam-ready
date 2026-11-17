@@ -76,7 +76,8 @@ class DailyService {
     final rnd = Random(_hash('$email|$day'));
     final difficulty = Difficulty.values[rnd.nextInt(Difficulty.values.length)];
     final pool = [
-      for (final id in difficulty.examIds) ...examById(id)!.questions,
+      // Listening items need the exam audio player, so they are not used here.
+      for (final id in difficulty.examIds) ...examById(id)!.questions.where((q) => !q.isListening),
     ];
     final q = pool[rnd.nextInt(pool.length)];
     final order = List<int>.generate(q.options.length, (i) => i);

@@ -598,7 +598,8 @@ class _AttemptTile extends StatelessWidget {
               const SizedBox(height: 8),
               Wrap(spacing: 6, runSpacing: 6, children: [
                 Chip2(r.verdict.title, bg: st.soft, fg: st.onSoft, icon: st.icon),
-                for (final s in Skill.values) Chip2('${s.label} ${r.skills[s]!.pct}%'),
+                for (final s in Skill.values)
+                  if (r.skills[s]!.total > 0) Chip2('${s.label} ${r.skills[s]!.pct}%'),
                 if (a.wasFree) const Chip2('Free mock', icon: Icons.card_giftcard_rounded),
                 if (a.autoSubmitted) const Chip2('Auto-submitted', icon: Icons.timer_off_outlined),
               ]),

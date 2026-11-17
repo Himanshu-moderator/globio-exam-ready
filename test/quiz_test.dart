@@ -9,6 +9,7 @@ import 'package:globio_exam_ready/models/quiz.dart';
 import 'package:globio_exam_ready/services/attempt_store.dart';
 import 'package:globio_exam_ready/services/quiz_engine.dart';
 import 'package:globio_exam_ready/services/readiness.dart';
+import 'package:globio_exam_ready/services/speech.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Answers an attempt so that exactly [correctPerSkill] questions per skill are right.
@@ -54,6 +55,14 @@ void main() {
           if (q.skill == Skill.reading) {
             expect(q.passage?.trim(), isNotEmpty, reason: '$where: reading needs a text');
           }
+          if (q.skill == Skill.listening) {
+            expect(q.audio?.trim(), isNotEmpty, reason: '$where: listening needs a script');
+            expect(q.passage, isNull, reason: '$where: listening text must not be shown');
+            expect(q.plays, inInclusiveRange(1, 2), reason: where);
+            expect(speechTurns(q.audio!), isNotEmpty, reason: where);
+          } else {
+            expect(q.audio, isNull, reason: where);
+          }
         }
       }
     });
@@ -64,13 +73,31 @@ void main() {
         for (final e in exams) ...[
           e.passRule,
           ...e.tips,
-          for (final q in e.questions) ...[q.prompt, q.explanation, ...q.options, q.passage ?? ''],
+          for (final q in e.questions) ...[q.prompt, q.explanation, ...q.options, q.passage ?? '', q.audio ?? ''],
         ],
         for (final g in topicGuides.values) ...[g.title, g.fix, g.example, g.practise],
       ];
       for (final t in texts) {
         expect(banned.hasMatch(t), isFalse, reason: 'unsupported glyph in: $t');
       }
+    });
+
+    test('the mock mirrors the real exam: 4 skills, listening = reading, max 16 questions', () {
+      for (final e in exams) {
+        expect(e.totalQuestions, lessThanOrEqualTo(16), reason: e.id);
+        expect(e.totalQuestions, 16, reason: e.id);
+        final listen = e.questions.where((q) => q.isListening).toList();
+        expect(listen.length, e.questions.where((q) => q.skill == Skill.reading).length,
+            reason: '${e.id}: listening and reading weigh the same, as in the real exam');
+        expect(listen.where((q) => q.plays == 1), isNotEmpty,
+            reason: '${e.id}: some recordings are heard only once, as in the real exam');
+      }
+    });
+
+    test('speech script: speaker marks are not spoken, long lines split at sentences', () {
+      final t = speechTurns('A: Hallo! Wie geht es dir?\nB: Gut, danke.\nAchtung: Gleis drei.');
+      expect(t.map((x) => x.text), ['Hallo!', 'Wie geht es dir?', 'Gut, danke.', 'Achtung: Gleis drei.']);
+      expect(t.map((x) => x.speaker), [0, 0, 1, 0]);
     });
 
     test('Richtig/Falsch items are not all the same answer', () {
@@ -127,7 +154,7 @@ void main() {
       final second = QuizEngine.create(exam, history: [first], random: Random(8));
       final overlap = first.items.map((i) => i.questionId).toSet()
         ..retainAll(second.items.map((i) => i.questionId));
-      expect(overlap, isEmpty, reason: 'bank has 10 per skill, so 5 fresh ones are available');
+      expect(overlap, isEmpty, reason: 'bank has 10 per skill, so 4 fresh ones are available');
     });
   });
 
@@ -135,48 +162,91 @@ void main() {
     final goethe = examById('goethe-a1')!; // pass 60
     final osd = examById('osd-a1')!; // pass 50
 
-    AttemptResult run(ExamInfo e, int v, int g, int r) {
-      final a = QuizEngine.create(e, random: Random(3));
-      answer(e, a, {Skill.vocabulary: v, Skill.grammar: g, Skill.reading: r});
-      a.submittedAt = DateTime.now();
+    /// Correct answers per skill: listening, reading, grammar, vocabulary (4 each).
+    AttemptResult run(ExamInfo e, int l, int r, int g, int v, {int seed = 3, DateTime? at}) {
+      final a = QuizEngine.create(e, random: Random(seed));
+      answer(e, a, {Skill.listening: l, Skill.reading: r, Skill.grammar: g, Skill.vocabulary: v});
+      a.submittedAt = at ?? DateTime.now();
       return Readiness.evaluate(e, a);
     }
 
     test('all correct → ready, no focus areas', () {
-      final res = run(goethe, 5, 5, 5);
+      final res = run(goethe, 4, 4, 4, 4);
       expect(res.overallPct, 100);
       expect(res.verdict, Verdict.ready);
       expect(res.focusAreas, isEmpty);
     });
 
     test('high total but one weak skill is NOT ready (one weak part fails the exam)', () {
-      final res = run(goethe, 5, 5, 2); // 80% overall, reading 40%
-      expect(res.overallPct, 80);
+      final res = run(goethe, 4, 4, 4, 1); // 81% overall, vocabulary 25%
+      expect(res.overallPct, 81);
       expect(res.verdict, isNot(Verdict.ready));
     });
 
+    test('weak listening blocks "ready" just like any other skill', () {
+      final res = run(goethe, 1, 4, 4, 4); // 81% overall, listening 25%
+      expect(res.verdict, isNot(Verdict.ready));
+      expect(res.focusAreas.first.skill, Skill.listening);
+    });
+
     test('around the pass mark → almost ready', () {
-      final res = run(goethe, 3, 3, 4); // 67%, weakest 60
+      final res = run(goethe, 3, 3, 3, 2); // 69%, weakest 50
       expect(res.verdict, Verdict.almost);
     });
 
     test('below the pass mark → not ready', () {
-      final res = run(goethe, 2, 2, 2); // 40%
+      final res = run(goethe, 2, 2, 2, 2); // 50%
       expect(res.verdict, Verdict.notYet);
     });
 
     test('pass mark is exam-specific: same score can mean different verdicts', () {
-      expect(run(goethe, 3, 3, 2).verdict, Verdict.notYet); // 53% < 60
-      expect(run(osd, 3, 3, 2).verdict, Verdict.almost); // 53% ≥ 50
+      expect(run(goethe, 3, 2, 2, 2).verdict, Verdict.notYet); // 56% < 60
+      expect(run(osd, 3, 2, 2, 2).verdict, Verdict.almost); // 56% ≥ 50
     });
 
     test('readiness score = 60% overall + 40% weakest skill', () {
-      final res = run(goethe, 5, 4, 2); // overall 73, weakest 40
-      expect(res.readinessScore, (0.6 * 73 + 0.4 * 40).round());
+      final res = run(goethe, 4, 4, 3, 1); // overall 75, weakest 25
+      expect(res.readinessScore, (0.6 * 75 + 0.4 * 25).round());
+    });
+
+    test('close call: flagged when one answer would change the verdict', () {
+      expect(run(goethe, 4, 4, 3, 3).isCloseCall, isTrue, reason: 'one more grammar mistake › almost');
+      expect(run(goethe, 4, 4, 4, 4).isCloseCall, isFalse, reason: 'one mistake still leaves it ready');
+      expect(run(goethe, 0, 0, 0, 0).isCloseCall, isFalse);
+    });
+
+    test('confidence: one mock asks for a second; two agreeing mocks confirm', () {
+      final t0 = DateTime(2026, 11, 10);
+      final first = run(goethe, 4, 4, 4, 4, seed: 1, at: t0);
+      expect(Readiness.confidence(first, [first.attempt]).level, ConfidenceLevel.singleMock);
+
+      final second = run(goethe, 4, 4, 4, 4, seed: 2, at: t0.add(const Duration(days: 1)));
+      final c = Readiness.confidence(second, [second.attempt, first.attempt]);
+      expect(c.level, ConfidenceLevel.confirmed);
+      expect(c.mocks, 2);
+      expect(c.questions, 32);
+    });
+
+    test('confidence: a lucky mock after a weak one is not confirmed', () {
+      final t0 = DateTime(2026, 11, 10);
+      final weak = run(goethe, 1, 1, 1, 1, seed: 1, at: t0);
+      final lucky = run(goethe, 4, 4, 4, 4, seed: 2, at: t0.add(const Duration(days: 1)));
+      final c = Readiness.confidence(lucky, [lucky.attempt, weak.attempt]);
+      expect(c.level, ConfidenceLevel.mixed);
+      expect(c.verdict, isNot(Verdict.ready));
+    });
+
+    test('confidence ignores other exams and later mocks', () {
+      final t0 = DateTime(2026, 11, 10);
+      final cur = run(goethe, 4, 4, 4, 4, seed: 1, at: t0);
+      final otherExam = run(osd, 0, 0, 0, 0, seed: 2, at: t0.subtract(const Duration(days: 1)));
+      final later = run(goethe, 0, 0, 0, 0, seed: 3, at: t0.add(const Duration(days: 1)));
+      expect(Readiness.confidence(cur, [cur.attempt, otherExam.attempt, later.attempt]).level,
+          ConfidenceLevel.singleMock);
     });
 
     test('focus areas come only from wrong answers, max 3', () {
-      final res = run(goethe, 1, 1, 1);
+      final res = run(goethe, 1, 1, 1, 1);
       expect(res.focusAreas.length, lessThanOrEqualTo(3));
       final wrongTopics = res.reviews.where((r) => !r.isCorrect).map((r) => r.question.topic).toSet();
       for (final f in res.focusAreas) {
@@ -185,7 +255,7 @@ void main() {
     });
 
     test('focus areas cover every weak skill before repeating one', () {
-      final res = run(goethe, 0, 2, 4); // vocab 0%, grammar 40% (both weak), reading 80%
+      final res = run(goethe, 4, 4, 1, 0); // vocab 0%, grammar 25% (both weak), others 100%
       final skills = res.focusAreas.map((f) => f.skill).toSet();
       expect(skills, containsAll([Skill.vocabulary, Skill.grammar]));
       expect(res.focusAreas.first.skill, Skill.vocabulary, reason: 'weakest skill first');
@@ -219,7 +289,9 @@ void main() {
     test('JSON round trip keeps everything', () {
       final a = QuizEngine.create(exam, random: Random(2));
       a.items[0].chosen = 2;
+      a.items[1].heard = 1;
       final b = Attempt.fromJson(jsonDecode(jsonEncode(a.toJson())))!;
+      expect(b.items[1].heard, 1, reason: 'listening play count survives a refresh');
       expect(b.id, a.id);
       expect(b.items.map((i) => i.questionId), a.items.map((i) => i.questionId));
       expect(b.items[0].chosen, 2);
