@@ -129,7 +129,7 @@ class _ResultScreenState extends State<ResultScreen> {
                         SizedBox(width: 14),
                         Expanded(
                           child: Text(
-                            'No mistakes in this mock. Keep your level up with timed practice papers, and train listening and speaking — they are not covered here.',
+                            'No mistakes in this mock. Keep your level up with timed practice papers, and train writing and speaking — they are not covered here.',
                             style: TextStyle(fontSize: 14.5, height: 1.55),
                           ),
                         ),

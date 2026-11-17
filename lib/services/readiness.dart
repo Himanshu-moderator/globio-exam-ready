@@ -261,7 +261,7 @@ extension VerdictText on Verdict {
       };
 
   String get message => switch (this) {
-        Verdict.ready => 'You are comfortably above the pass mark in every skill. Book your exam and keep practising listening and speaking.',
+        Verdict.ready => 'You are comfortably above the pass mark in every skill. Book your exam and keep practising writing and speaking — this mock does not test them.',
         Verdict.almost => 'You are around the pass mark. Fix the focus areas below and take another mock before you book.',
         Verdict.notYet => 'Booking now risks losing your exam fee. Work on the focus areas below first, then take another mock.',
       };

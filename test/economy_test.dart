@@ -6,6 +6,7 @@ import 'package:globio_exam_ready/services/attempt_store.dart';
 import 'package:globio_exam_ready/services/daily_service.dart';
 import 'package:globio_exam_ready/services/mentor_service.dart';
 import 'package:globio_exam_ready/services/mock_access.dart';
+import 'package:globio_exam_ready/services/offer_service.dart';
 import 'package:globio_exam_ready/services/profile_service.dart';
 import 'package:globio_exam_ready/services/quiz_engine.dart';
 import 'package:globio_exam_ready/services/real_result_service.dart';
@@ -220,6 +221,49 @@ void main() {
       expect(await RealResultService.add(email, examId: 'goethe-a1', date: now, passed: true, score: 120, now: now), isNotNull);
       expect(await RealResultService.add(email, examId: 'goethe-a1', date: now, passed: true, score: 72, now: now), isNull);
       expect((await RealResultService.all(email)).single.score, 72);
+    });
+  });
+
+  group('Launch offer', () {
+    final during = Ist.instant(2026, 11, 20, 12, 0);
+
+    test('open from 17 Nov 00:00 IST through 25 Nov (IST)', () {
+      expect(LaunchOffer.isOpen(Ist.instant(2026, 11, 16, 23, 59)), isFalse);
+      expect(LaunchOffer.isOpen(Ist.instant(2026, 11, 17, 0, 0)), isTrue);
+      expect(LaunchOffer.isOpen(Ist.instant(2026, 11, 25, 23, 59)), isTrue);
+      expect(LaunchOffer.isOpen(Ist.instant(2026, 11, 26, 0, 0)), isFalse);
+    });
+
+    test('welcome coins buy 3 mocks once; each mock uses one; refunds give it back', () async {
+      await Wallet.ensureWelcome(email);
+      expect(await LaunchOffer.buy(email, now: during), isNull);
+      expect(await Wallet.balance(email), 0);
+      expect(await LaunchOffer.left(email), 3);
+      expect(await LaunchOffer.buy(email, now: during), isNotNull, reason: 'only once per account');
+
+      final exam = examById('goethe-a1')!;
+      final a = QuizEngine.create(exam, random: Random(1));
+      expect(await MockAccess.pay(email, a, useFree: false, useOffer: true), isNull);
+      expect(a.payment, 'offer');
+      expect(await LaunchOffer.left(email), 2);
+      await MockAccess.refund(email, a);
+      expect(await LaunchOffer.left(email), 3);
+
+      for (var i = 0; i < 3; i++) {
+        final b = QuizEngine.create(exam, random: Random(10 + i));
+        expect(await MockAccess.pay(email, b, useFree: false, useOffer: true), isNull);
+      }
+      expect(await LaunchOffer.left(email), 0);
+      final c = QuizEngine.create(exam, random: Random(20));
+      expect(await MockAccess.pay(email, c, useFree: false, useOffer: true), isNotNull);
+      expect(await Wallet.balance(email), 0, reason: 'offer mocks never charge coins');
+    });
+
+    test('cannot be bought after it ends or without 100 coins', () async {
+      expect(await LaunchOffer.buy(email, now: during), isNotNull, reason: 'no coins yet');
+      await Wallet.ensureWelcome(email);
+      expect(await LaunchOffer.buy(email, now: Ist.instant(2026, 11, 26, 9, 0)), isNotNull);
+      expect(await LaunchOffer.left(email), 0);
     });
   });
 }

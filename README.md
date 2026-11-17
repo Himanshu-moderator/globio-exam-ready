@@ -5,6 +5,31 @@ ready to book their **Goethe-Zertifikat A1** or **ÖSD A1** exam.
 
 Built for the Globio *Founder's Office – Product Manager Intern* assignment.
 
+## For reviewers
+
+**Live app:** https://himanshu-moderator.github.io/globio-exam-ready/ — best in Chrome, Edge or
+Safari (they include a German voice for the listening questions).
+
+**Try it in 2 minutes:** sign up (local only, any email) › *Mock exams* › *Goethe-Zertifikat A1* ›
+answer 16 questions › the analysis shows readiness per skill, the 2–3 things to practise before
+booking, and how sure the result is.
+
+**The core of the assignment — how "ready" is decided** lives in one file,
+[`lib/services/readiness.dart`](lib/services/readiness.dart) (explained [below](#how-ready-is-calculated)).
+Pass marks per exam are in [`lib/data/exams.dart`](lib/data/exams.dart); questions in
+[`lib/data/banks/`](lib/data/banks/).
+
+| Asked for in the brief | Where |
+|---|---|
+| A check across vocabulary, grammar and reading | 16 questions: those three + listening, 4 each ([why 16](#the-mock-exams)) |
+| Readiness per skill | Skill breakdown on the analysis page, against the real pass mark |
+| The 2–3 things to practise before booking | "Practise before you book": up to 3 focus areas with fix, example, practice tip |
+| Public link + code on GitHub | Links above |
+
+Everything after the analysis page — coins, free mock, mentor booking, profile — is an
+exploration of how the readiness check could grow into a product. It is kept in separate files
+so the core can be read and changed on its own.
+
 ## Status
 
 | Part | State |
@@ -22,12 +47,13 @@ Built for the Globio *Founder's Office – Product Manager Intern* assignment.
 | Free biweekly mock (Fri 6 PM – Sat 6 PM IST) | ✅ Done |
 | Mentor session request & booking | ✅ Done |
 | Real exam result reporting, linked to the latest mock (predicted vs real) | ✅ Done |
+| Welcome popup (claim 100 coins) that flips to a limited launch offer | ✅ Done |
 
 ## Coins
 
 | Earn | Coins |
 |---|---|
-| Welcome bonus | +100 |
+| Welcome bonus (claimed in the welcome popup) | +100 |
 | Mock score | score % (full marks = +100, the price of the next mock) |
 | Daily question — easy (A1) / medium (A2) / advanced (B1) | +5 / +10 / +20 (advanced = 1/5 of a mock) |
 | Daily question — wrong answer | +1 |
@@ -36,7 +62,13 @@ Built for the Globio *Founder's Office – Product Manager Intern* assignment.
 |---|---|
 | Mock exam | 100 |
 | Mentor session (= two full-marks mocks) | 200 |
+| **Launch offer: 3 mocks**, 17–25 Nov 2026 only, once per account | 100 |
 | Free mock, every other Friday 6 PM – Saturday 6 PM IST | free (one attempt per window) |
+
+**Welcome popup and launch offer:** a new account sees a welcome card and claims its 100 coins.
+The card then flips to a limited offer — 3 mocks for 100 coins, only from 17 to 25 November 2026
+(IST) — so anyone trying the prototype in that week can take three full mocks, including a retake
+that gives a *confirmed* readiness result. Offer mocks never expire once bought.
 
 The balance is the sum of an append-only ledger with a unique id per entry, so a reward or
 purchase can never be applied twice. The daily question is derived from (email, IST day), so a

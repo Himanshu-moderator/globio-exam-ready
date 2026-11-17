@@ -7,6 +7,7 @@ import '../services/attempt_store.dart';
 import '../services/auth_service.dart';
 import '../services/local_store.dart';
 import '../services/mock_access.dart';
+import '../services/offer_service.dart';
 import '../services/quiz_engine.dart';
 import '../services/speech.dart';
 import '../services/wallet_service.dart';
@@ -50,6 +51,8 @@ class MockLauncher {
     final free = await MockAccess.freeStatus(email);
     final balance = await Wallet.balance(email);
     final useFree = preferFree && free.available;
+    final offerLeft = await LaunchOffer.left(email);
+    final useOffer = !useFree && offerLeft > 0;
     // Listening is read by the browser's German voice. Check before any coins
     // are spent, so a learner is never charged for a mock they cannot hear.
     final audioOk = Speech.supported && await Speech.hasGermanVoice();
@@ -57,13 +60,20 @@ class MockLauncher {
 
     final go = await showDialog<bool>(
       context: context,
-      builder: (_) => _StartDialog(exam: exam, useFree: useFree, balance: balance, free: free, audioOk: audioOk),
+      builder: (_) => _StartDialog(
+        exam: exam,
+        useFree: useFree,
+        offerLeft: useOffer ? offerLeft : 0,
+        balance: balance,
+        free: free,
+        audioOk: audioOk,
+      ),
     );
     if (go != true || !context.mounted) return;
 
     final history = await store.history(email);
     final attempt = QuizEngine.create(exam, history: history);
-    final payErr = await MockAccess.pay(email, attempt, useFree: useFree);
+    final payErr = await MockAccess.pay(email, attempt, useFree: useFree, useOffer: useOffer);
     if (payErr != null) {
       messenger.showSnackBar(SnackBar(content: Text(payErr)));
       return;
@@ -86,12 +96,16 @@ class _StartDialog extends StatelessWidget {
   const _StartDialog({
     required this.exam,
     required this.useFree,
+    required this.offerLeft,
     required this.balance,
     required this.free,
     required this.audioOk,
   });
   final ExamInfo exam;
   final bool useFree;
+
+  /// Launch-offer mocks left (> 0 means this mock uses one).
+  final int offerLeft;
   final int balance;
   final FreeStatus free;
 
@@ -100,7 +114,8 @@ class _StartDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final canPay = useFree || balance >= Wallet.mockPrice;
+    final useOffer = offerLeft > 0;
+    final canPay = useFree || useOffer || balance >= Wallet.mockPrice;
     final rules = [
       (Icons.quiz_outlined,
           '${exam.totalQuestions} questions: ${exam.perSkill} each of listening, reading, grammar and vocabulary — mixed order.'),
@@ -155,12 +170,16 @@ class _StartDialog extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: useFree
+                color: useFree || useOffer
                     ? GlobioColors.successSoft
                     : (canPay ? GlobioColors.muted : GlobioColors.destructiveSoft),
                 borderRadius: BorderRadius.circular(GlobioTheme.radius),
               ),
-              child: useFree
+              child: useOffer
+                  ? Text(
+                      'Launch offer mock — no coins needed. $offerLeft of ${LaunchOffer.mocks} left, ${offerLeft - 1} after this one.',
+                      style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: GlobioColors.success))
+                  : useFree
                   ? Text('Free biweekly mock — no coins needed. Open until ${Ist.label(free.open!.end)}.',
                       style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: GlobioColors.success))
                   : Row(children: [
@@ -185,7 +204,7 @@ class _StartDialog extends StatelessWidget {
               child: Wrap(alignment: WrapAlignment.end, spacing: 10, runSpacing: 10, children: [
                 PillButton(label: 'Not now', variant: PillVariant.outlineDark, onPressed: () => Navigator.of(context).pop(false)),
                 PillButton(
-                  label: !audioOk ? 'Start anyway' : (useFree ? 'Start free mock' : 'Pay & start'),
+                  label: !audioOk ? 'Start anyway' : (useFree ? 'Start free mock' : (useOffer ? 'Start mock' : 'Pay & start')),
                   icon: Icons.arrow_forward_rounded,
                   onPressed: canPay ? () => Navigator.of(context).pop(true) : null,
                 ),

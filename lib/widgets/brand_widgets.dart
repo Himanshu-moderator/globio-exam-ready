@@ -106,12 +106,16 @@ class _PillButtonState extends State<PillButton> {
         mainAxisSize: widget.expand ? MainAxisSize.max : MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(
-            widget.label,
-            style: TextStyle(
-              color: fg,
-              fontSize: widget.large ? 16 : 14,
-              fontWeight: widget.variant == PillVariant.gold ? FontWeight.w700 : FontWeight.w600,
+          // Flexible: on narrow screens a long label wraps instead of overflowing.
+          Flexible(
+            child: Text(
+              widget.label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: fg,
+                fontSize: widget.large ? 16 : 14,
+                fontWeight: widget.variant == PillVariant.gold ? FontWeight.w700 : FontWeight.w600,
+              ),
             ),
           ),
           if (widget.icon != null) ...[

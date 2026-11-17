@@ -6,6 +6,7 @@ import '../services/wallet_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/brand_widgets.dart';
 import '../widgets/coin_widgets.dart';
+import '../widgets/welcome_offer.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/mentor_tab.dart';
 import 'tabs/mocks_tab.dart';
@@ -104,9 +105,15 @@ class _AppShellState extends State<AppShell> {
     final email = AuthService.instance.currentUser?.email;
     if (email != null) {
       await ProfileService.ensure(email); // personal student ID
-      await Wallet.ensureWelcome(email); // 100 welcome coins, once
     }
     if (mounted) setState(() => _ready = true);
+    // New account: welcome popup to claim the 100 welcome coins (then the
+    // launch offer on the back of the card, while it runs).
+    if (email != null && !await Wallet.has(email, 'welcome') && mounted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) WelcomeOfferDialog.show(context, email: email);
+      });
+    }
   }
 
   void _goTo(ShellTab t) => ShellNav.tab.value = t;

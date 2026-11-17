@@ -64,9 +64,9 @@ class Speech {
       (await _voices()).any((v) => _norm(v.lang).startsWith('de'));
 
   /// German voices, best match for [lang] first (e.g. de-AT for ÖSD).
-  static Future<List<_Voice>> _germanVoices(String lang) async {
+  static List<_Voice> _germanOf(List<_Voice> all, String lang) {
     final want = _norm(lang);
-    final de = (await _voices()).where((v) => _norm(v.lang).startsWith('de')).toList();
+    final de = all.where((v) => _norm(v.lang).startsWith('de')).toList();
     de.sort((a, b) {
       final ea = _norm(a.lang) == want ? 0 : 1;
       final eb = _norm(b.lang) == want ? 0 : 1;
@@ -78,13 +78,21 @@ class Speech {
   /// Speaks the whole script and completes when it has finished (or was
   /// stopped). Different speakers get different voices when the browser has
   /// several German voices, otherwise a different pitch.
+  ///
+  /// The utterances are queued synchronously inside the tap that called
+  /// this (voices are normally loaded already), because iOS Safari only
+  /// allows speech that starts directly from a user gesture.
   static Future<void> speak(String script, {String lang = 'de-DE', double rate = 0.9}) async {
     final synth = _synth;
     if (synth == null) return;
-    stop();
+    // Only cancel when something is playing: Chrome can drop an utterance
+    // queued right after cancel().
+    if (_running != null) stop();
     final turns = speechTurns(script);
     if (turns.isEmpty) return;
-    final voices = await _germanVoices(lang);
+    var all = synth.getVoices().toDart;
+    if (all.isEmpty) all = await _voices(); // voices not loaded yet (rare)
+    final voices = _germanOf(all, lang);
     final done = Completer<void>();
     _running = done;
     const pitches = [1.0, 0.8, 1.2];

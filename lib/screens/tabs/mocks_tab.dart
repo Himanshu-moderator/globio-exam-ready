@@ -7,6 +7,7 @@ import '../../services/attempt_store.dart';
 import '../../services/auth_service.dart';
 import '../../services/local_store.dart';
 import '../../services/mock_access.dart';
+import '../../services/offer_service.dart';
 import '../../services/readiness.dart';
 import '../../services/wallet_service.dart';
 import '../../theme/app_theme.dart';
@@ -17,6 +18,7 @@ import '../../widgets/brand_widgets.dart';
 import '../../widgets/coin_widgets.dart';
 import '../../widgets/mock_launcher.dart';
 import '../../widgets/verdict_style.dart';
+import '../../widgets/welcome_offer.dart';
 
 class MocksTab extends StatefulWidget {
   const MocksTab({super.key});
@@ -31,6 +33,7 @@ class _MocksTabState extends State<MocksTab> {
   List<Attempt> _history = [];
   FreeStatus? _free;
   int _balance = 0;
+  int _offerLeft = 0;
 
   @override
   void initState() {
@@ -58,8 +61,10 @@ class _MocksTabState extends State<MocksTab> {
     final history = await store.history(email);
     final free = await MockAccess.freeStatus(email);
     final balance = await Wallet.balance(email);
+    final offerLeft = await LaunchOffer.left(email);
     if (!mounted) return;
     setState(() {
+      _offerLeft = offerLeft;
       _active = active;
       _history = history;
       _free = free;
@@ -89,6 +94,7 @@ class _MocksTabState extends State<MocksTab> {
             style: TextStyle(fontSize: 14.5, color: GlobioColors.mutedForeground, height: 1.55),
           ),
           const SizedBox(height: 20),
+          const LaunchOfferBanner(),
           _AccessBar(free: _free!, balance: _balance),
           const SizedBox(height: 20),
           if (_active != null) ...[
@@ -109,6 +115,7 @@ class _MocksTabState extends State<MocksTab> {
                     attempts: _history.where((a) => a.examId == e.id).length,
                     locked: _active != null,
                     free: _free!.available,
+                    offerLeft: _offerLeft,
                     balance: _balance,
                     onStart: () => MockLauncher.start(context, e),
                   ),
@@ -191,9 +198,11 @@ class _ExamCard extends StatelessWidget {
     required this.attempts,
     required this.locked,
     required this.free,
+    required this.offerLeft,
     required this.balance,
     required this.onStart,
   });
+  final int offerLeft;
   final ExamInfo exam;
   final AttemptResult? last;
   final int attempts;
@@ -205,7 +214,8 @@ class _ExamCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final style = last == null ? null : VerdictStyle.of(last!.verdict);
-    final affordable = free || balance >= Wallet.mockPrice;
+    final offer = !free && offerLeft > 0;
+    final affordable = free || offer || balance >= Wallet.mockPrice;
     return Panel(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
@@ -231,6 +241,8 @@ class _ExamCard extends StatelessWidget {
           ),
           free
               ? const Chip2('FREE NOW', bg: GlobioColors.successSoft, fg: GlobioColors.success)
+              : offer
+              ? Chip2('OFFER · $offerLeft LEFT', bg: GlobioColors.successSoft, fg: GlobioColors.success)
               : Container(
                   padding: const EdgeInsets.fromLTRB(4, 4, 10, 4),
                   decoration: BoxDecoration(color: GlobioColors.secondarySoft, borderRadius: BorderRadius.circular(999)),
@@ -269,7 +281,9 @@ class _ExamCard extends StatelessWidget {
         PillButton(
           label: locked
               ? 'Finish your running mock first'
-              : (!affordable ? 'Need ${Wallet.mockPrice} coins' : (free ? 'Start free mock' : 'Start mock · ${Wallet.mockPrice} coins')),
+              : (!affordable
+                  ? 'Need ${Wallet.mockPrice} coins'
+                  : (free ? 'Start free mock' : (offer ? 'Start mock · offer' : 'Start mock · ${Wallet.mockPrice} coins'))),
           variant: PillVariant.primary,
           expand: true,
           onPressed: locked || !affordable ? null : onStart,

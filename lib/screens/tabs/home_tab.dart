@@ -22,6 +22,7 @@ import '../../widgets/brand_widgets.dart';
 import '../../widgets/coin_widgets.dart';
 import '../../widgets/mock_launcher.dart';
 import '../../widgets/verdict_style.dart';
+import '../../widgets/welcome_offer.dart';
 import '../app_shell.dart';
 import '../result_screen.dart';
 
@@ -150,6 +151,7 @@ class _HomeTabState extends State<HomeTab> {
           const Text('Practise a little every day and book your exam when you are ready.',
               style: TextStyle(fontSize: 15, color: GlobioColors.mutedForeground)),
           const SizedBox(height: 24),
+          const LaunchOfferBanner(),
           if (_active != null) ...[
             _RunningBanner(attempt: _active!, onResume: () => MockLauncher.resumeActive(context)),
             const SizedBox(height: 20),

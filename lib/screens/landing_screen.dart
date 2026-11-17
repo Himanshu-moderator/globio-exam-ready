@@ -460,7 +460,7 @@ class _Hero extends StatelessWidget {
             alignment: WrapAlignment.center,
             children: [
               _StatChip(icon: Icons.quiz_outlined, value: '16', label: 'Questions'),
-              _StatChip(icon: Icons.layers_outlined, value: '3', label: 'Skills checked'),
+              _StatChip(icon: Icons.layers_outlined, value: '4', label: 'Skills checked'),
               _StatChip(icon: Icons.bolt_outlined, value: 'Instant', label: 'Result'),
             ],
           ),

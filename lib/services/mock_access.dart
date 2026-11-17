@@ -1,6 +1,7 @@
 import '../models/attempt.dart';
 import '../utils/ist.dart';
 import 'local_store.dart';
+import 'offer_service.dart';
 import 'wallet_service.dart';
 
 class FreeStatus {
@@ -19,7 +20,7 @@ class FreeStatus {
 }
 
 /// Decides how a mock is paid for: the free biweekly mock (one attempt per
-/// window) or 100 coins.
+/// window), a launch-offer mock, or 100 coins.
 class MockAccess {
   MockAccess._();
 
@@ -39,8 +40,14 @@ class MockAccess {
 
   /// Pays for [attempt] and records the payment on it.
   /// Returns null on success, otherwise a message.
-  static Future<String?> pay(String email, Attempt attempt, {required bool useFree, DateTime? now}) async {
+  static Future<String?> pay(String email, Attempt attempt,
+      {required bool useFree, bool useOffer = false, DateTime? now}) async {
     final t = now ?? DateTime.now();
+    if (useOffer && !useFree) {
+      if (!await LaunchOffer.use(email, attempt.id)) return 'You have no offer mocks left.';
+      attempt.payment = 'offer';
+      return null;
+    }
     if (useFree) {
       final status = await freeStatus(email, now: t);
       if (!status.available) return 'The free mock is not available right now.';
@@ -67,6 +74,8 @@ class MockAccess {
       final id = p.substring(5);
       final used = await _used(email)..remove(id);
       await LocalStore.write(_key(email), used.toList());
+    } else if (p == 'offer') {
+      await LaunchOffer.giveBack(email, attempt.id);
     } else if (p == 'coins') {
       await Wallet.add(email,
           CoinEntry(id: 'refund:${attempt.id}', amount: Wallet.mockPrice, kind: 'refund', note: 'Mock could not start — refund', at: DateTime.now()));
